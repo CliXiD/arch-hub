@@ -4,6 +4,6 @@
   "mode": "new",
   "remote": "CliXiD/arch-hub",
   "created": "2026-11-08",
-  "purpose": null,
-  "language": null
+  "purpose": "An E2E architecture map for software teams: model applications, their infrastructure (e.g. EKS, RDS), on-prem systems and the integrations between them (incl. network paths such as a landing zone), show each application's dependencies and linkage, and assess the impact of a change request across the whole chain.",
+  "language": "English"
 }

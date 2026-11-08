@@ -1,10 +1,35 @@
 {
   "folders": [
-    { "path": ".", "name": "hub" }
+    {
+      "path": ".",
+      "name": "hub"
+    },
+    {
+      "path": "repos/arch-api",
+      "name": "arch-api (unknown)"
+    },
+    {
+      "path": "repos/arch-web",
+      "name": "arch-web (unknown)"
+    },
+    {
+      "path": "repos/arch-deploy",
+      "name": "arch-deploy (unknown)"
+    }
   ],
   "settings": {
-    "files.exclude": { "repos": true, ".worktrees": true },
-    "search.exclude": { "**/node_modules": true, "**/.next": true, "**/.svelte-kit": true, "**/dist": true, "**/.venv": true, "**/target": true },
+    "files.exclude": {
+      "repos": true,
+      ".worktrees": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.next": true,
+      "**/.svelte-kit": true,
+      "**/dist": true,
+      "**/.venv": true,
+      "**/target": true
+    },
     "git.autoRepositoryDetection": "subFolders",
     "git.repositoryScanMaxDepth": 2
   }
