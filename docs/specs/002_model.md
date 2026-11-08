@@ -20,7 +20,7 @@ instances, each in one environment. Every later spec reads and writes this model
 - **SPEC-model-07** An edge connects two nodes in the same environment, and is unique by `(environment, type, from, to)`. Edges across environments are not allowed in the MVP and fail with `422`. [BR-001] [BR-002]
 - **SPEC-model-08** Every node and edge has a `source` (`ui`, `yaml`, `discovery` or `import`) recording the path that last wrote it. [BR-004]
 - **SPEC-model-09** Deleting a node also deletes its edges in the same transaction, and both are recorded in the history ([ADR-0005]). Deleting a team or type that is still in use fails with `409` (`type: /problems/in-use`), and the problem gives a count of the dependents. [BR-001] [BR-003]
-- **SPEC-model-10** No attribute may hold a secret. Any attribute whose name matches `(?i)(password|passwd|secret|token|api[_-]?key|private[_-]?key|credential)`, or any string value that looks like a credential (a URL with userinfo `user:pass@`, a PEM block, an AWS access key `AKIA…`), is rejected with `422` (`type: /problems/secret-detected`). [NFR-002]
+- **SPEC-model-10** No attribute may hold a secret. Any attribute whose name matches `(?i)(password|passwd|secret|token|api[_-]?key|private[_-]?key|credential)`, or any string value that looks like a credential (a URL with userinfo `user:pass@`, a PEM block, an AWS access key `AKIA…`), is rejected with `422` (`type: /problems/secret-detected`). The problem names only the field path (for example `attributes.db_password`); the value is never echoed in the response or written to a log. [NFR-002] [NFR-001]
 
 ## Interfaces
 
@@ -32,7 +32,9 @@ All under `/api/v1`, JSON, RFC 9457 errors, permissions per [SPEC-identity-acces
 - `GET /nodes?environment=&kind=&type=&owner=&q=&limit=&cursor=` → a page of nodes (`q` matches id and name).
 - `GET /nodes/{environment}/{id}` → a node.
 - `GET /edges?environment=&type=&from=&to=&limit=&cursor=` → a page of edges.
-- `GET /graph?environment=` → every node and edge in one environment, in a compact form for rendering ([NFR-005]).
+- `GET /graph?environment=` → every node and edge in one environment, in a compact form for rendering ([NFR-005]): `{ "environment", "nodes": [{ "id", "kind", "type", "name", "owner", "tags" }], "edges": [{ "uid", "type", "from", "to", "attributes" }] }`. Node attributes are left out (read one node for them); edge attributes are kept so `calls` can show protocol and port.
+- Lists take `limit` (default 100, max 500) and an opaque `cursor`, and return `{ "items": [...], "next_cursor": string|null }`.
+- Node and edge reads return `ETag: "<version>"`.
 - Writes are in [003_editing-history.md] and [004_yaml-as-code.md].
 
 ## Data
@@ -48,7 +50,7 @@ All under `/api/v1`, JSON, RFC 9457 errors, permissions per [SPEC-identity-acces
 ## Non-functional
 
 - [NFR-005]: `GET /graph` for 2,000 nodes and 10,000 edges returns in under 1 s server-side, gzip on.
-- `version` gives optimistic locking: writes send `If-Match`, and a mismatch returns `412`.
+- `version` gives optimistic locking: updates and deletes must send `If-Match`; a mismatch returns `412` (`/problems/stale`) and a missing header `428` (`/problems/precondition-required`).
 
 ## Open questions
 
