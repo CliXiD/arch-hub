@@ -1,6 +1,6 @@
 # ADR-0002: Branch strategy
 
-- Status: Accepted
+- Status: Accepted (merge rule superseded by [ADR-0015])
 - Date: 2026-11-08
 - Deciders: khajonpot, /hub-init 2026-11-08
 - Relates to: [BR-040]

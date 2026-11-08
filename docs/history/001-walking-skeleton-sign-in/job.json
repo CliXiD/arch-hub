@@ -1,0 +1,75 @@
+{
+  "id": "001-walking-skeleton-sign-in",
+  "issue": 3,
+  "title": "Walking skeleton: sign-in, /api/v1/me and health",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/3",
+  "branch": "factory/001-walking-skeleton-sign-in",
+  "stage": "merged",
+  "round": 1,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "ui",
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 9.71,
+  "started": "2026-11-08T16:03:00Z",
+  "ended": "2026-11-08T16:45:16Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "ux": "sonnet",
+    "ui": "haiku",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "7da7dce7daac40720e8adc0503b38ca8543a8238",
+      "prs": {
+        "main": {
+          "pr": 2,
+          "url": "https://github.com/CliXiD/arch-api/pull/2",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "8c678f573b8cfe250904a4fd73f2850e0e395b85",
+      "prs": {
+        "main": {
+          "pr": 2,
+          "url": "https://github.com/CliXiD/arch-web/pull/2",
+          "merged": true
+        }
+      }
+    }
+  }
+}

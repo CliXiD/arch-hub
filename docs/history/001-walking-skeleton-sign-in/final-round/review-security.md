@@ -1,0 +1,22 @@
+VERDICT: PASS
+
+## Summary
+- Reviewed both new codebases: arch-api (JWT validation, role mapping, default-deny access middleware, `/api/v1/me`, health, metrics, logging, tracing, config, first migration, CI) and arch-web (OIDC Auth Code + PKCE, token storage, API client, shell, CI).
+- Token validation looks sound. It allows only asymmetric algs, checks that the alg matches the JWK's kty, curve and alg, and checks `iss`, `aud` (string or array), a required `exp`, and `nbf` with 30 s leeway. An unknown `kid` causes at most one refetch per 30 s, and every failure is a generic 401 with fixed detail text.
+- Access is default-deny. Every operation goes through `register()`. The middleware returns 403 for an undeclared role and for `public` outside `/healthz` and `/readyz`, and the Huma docs, OpenAPI and schema routes are disabled. `/metrics` is served only on `METRICS_ADDR`.
+- No sensitive data leaks in the paths I checked. The request log has only the subject. Config errors name the variable, never its value. otelpgx leaves out query parameters by default, otelgin v0.72 records no query string, and no secrets or real `.env` files are committed.
+- arch-web keeps tokens in an `InMemoryWebStorage` user store, so only the transient PKCE state is in sessionStorage. Bearer tokens go only to the configured API base URL. Nothing renders user strings as raw HTML.
+
+## Findings
+None.
+
+## Notes
+1. arch-api:internal/auth/jwks.go:52-82: `keySet.mu` stays locked during discovery and the JWKS HTTP call (5 s client timeout). Every token check waits behind a slow refetch, even for known kids. Also, until the first load succeeds (`loaded == false`), nothing rate-limits fetching. While Keycloak is down or slow, every request with a well-formed RS256 JWT and any `kid` starts a discovery plus JWKS fetch, one after another, under the lock. It isn't exploitable for access, but before production consider: doing the fetch outside the lock (or with singleflight), and applying the 30 s backoff to failed initial loads as well.
+2. arch-api:internal/auth/principal.go:94: any token whose `preferred_username` starts with `service-account-` counts as a service account, with subject = `client_id`/`azp`. If a human account ever got such a username, it would act as the client id (e.g. `arch-web`), and the audit log would record it that way. This is the spec's rule, and Keycloak controls usernames. Keep it in mind when change_log/actor writes arrive ([NFR-003]); checking `client_id` alone, or requiring `azp` to be a known service client, would be stricter.
+3. arch-api:internal/httpapi/serve.go:73: the API server sets only `ReadHeaderTimeout`. Add `ReadTimeout`/`WriteTimeout`/`IdleTimeout` and a body-size limit when the first request-body endpoints (import) arrive.
+4. arch-api: `/readyz` is unauthenticated and runs a DB ping plus a `SELECT` on every call, bounded to 2 s and by the pool size. It's fine inside the cluster. Don't expose it through a public ingress in arch-deploy.
+5. arch-api: otelgin trusts the sampled flag of an incoming `traceparent` (ParentBased sampling), and arch-web always sends `-01`. That's acceptable now. Consider a ratio sampler at the root when tracing is enabled in production. Spans record `url.path`, which will include node IDs once model routes exist. Those are identifiers, not attribute values, but keep [NFR-001] in mind.
+6. arch-web: a persistent 401 from the API (e.g. an audience misconfiguration) leads to removeUser, then signinRedirect, then an SSO return, then another 401: a redirect loop. This is availability/UX, not security, but a retry cap would help.
+7. arch-web: there is no CSP or security headers yet. That's expected, because nginx config is out of scope. It should come with the arch-deploy image work, since tokens are in JS memory.
+8. Both CI workflows set `permissions: contents: read` (good). Actions are pinned to major tags, not commit SHAs, so consider pinning SHAs. The new dependencies are the ones ADR-0003, ADR-0004, ADR-0007 and ADR-0011 name, and all are mainstream and maintained. The lockfile is committed and installed with `--frozen-lockfile`.
+9. The realm's audience mappers set `id.token.claim: false`, so ID tokens (aud `arch-web`) are rejected by the `aud` check. Keycloak refresh tokens are HS-signed, so the alg allowlist rejects them. The verifier doesn't check `typ`; it relies on these two properties instead.
