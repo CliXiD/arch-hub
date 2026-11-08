@@ -1,3 +1,17 @@
 {
-  "sources": []
+  "sources": [
+    {
+      "id": "S-001",
+      "kind": "prompt",
+      "title": "Product brief (hub-init interview)",
+      "ref": "prompt:2026-11-08 product brief",
+      "added": "2026-11-08",
+      "fetched_at": "2026-11-08T14:09:52Z",
+      "changed_at": "2026-11-08T14:09:52Z",
+      "sha256": "3d41d12bb557cacc4775252885b2457b5dc80c14a907427147eb0c68b4a81dc7",
+      "snapshot": "docs/sources/S-001.md",
+      "status": "active",
+      "notes": ""
+    }
+  ]
 }

@@ -25,6 +25,9 @@ loading and error states. Exact copy for anything a user reads.
 ## Repos
 
 <!-- hub:repos -->
+- [ ] arch-api — what changes
+- [ ] arch-web — what changes
+- [ ] arch-deploy — what changes
 <!-- /hub:repos -->
 
 ## Decisions

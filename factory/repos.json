@@ -1,12 +1,64 @@
 {
-  "repos": {},
-  "merge_order": [],
+  "repos": {
+    "arch-api": {
+      "path": "repos/arch-api",
+      "remote": "CliXiD/arch-api",
+      "url": "git@github.com:CliXiD/arch-api.git",
+      "base": "main",
+      "role": "Go REST API (gin + Huma v2): graph model, impact queries, YAML schema and import/export, arch CLI, audit log; owns the DB schema",
+      "checks": "factory/checks/arch-api.sh",
+      "implies": [
+        "db"
+      ],
+      "protected_paths": [
+        ".github/*",
+        "migrations/*"
+      ],
+      "auto_merge": false,
+      "stack": "unknown"
+    },
+    "arch-web": {
+      "path": "repos/arch-web",
+      "remote": "CliXiD/arch-web",
+      "url": "git@github.com:CliXiD/arch-web.git",
+      "base": "main",
+      "role": "React SPA: landscape, app-focus and impact views, editors, admin",
+      "checks": "factory/checks/arch-web.sh",
+      "implies": [],
+      "protected_paths": [
+        ".github/*"
+      ],
+      "auto_merge": false,
+      "stack": "unknown"
+    },
+    "arch-deploy": {
+      "path": "repos/arch-deploy",
+      "remote": "CliXiD/arch-deploy",
+      "url": "git@github.com:CliXiD/arch-deploy.git",
+      "base": "main",
+      "role": "Dockerfiles, Helm chart for EKS, Keycloak arch realm export",
+      "checks": "factory/checks/arch-deploy.sh",
+      "implies": [
+        "infra"
+      ],
+      "protected_paths": [
+        ".github/*"
+      ],
+      "auto_merge": false,
+      "stack": "unknown"
+    }
+  },
+  "merge_order": [
+    "arch-api",
+    "arch-web",
+    "arch-deploy"
+  ],
   "rules": [],
   "branching": {
     "strategy": "trunk",
     "envs": [],
     "release_prefix": "release/",
     "release_current": null,
-    "sync": null
+    "sync": "rebase"
   }
 }
