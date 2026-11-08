@@ -1,6 +1,6 @@
 # ADR-0005: Append-only change history
 
-- Status: Accepted
+- Status: Superseded by [ADR-0016]
 - Date: 2026-11-08
 - Deciders: khajonpot, /hub-init 2026-11-08
 - Relates to: [BR-042], [NFR-003]

@@ -1,6 +1,6 @@
 # ADR-0014: Separate database roles for migrations and runtime
 
-- Status: Proposed
+- Status: Accepted (implemented by migration 00005, hub issue #5)
 - Date: 2026-11-08
 - Deciders: grill session with khajonpot
 - Relates to: [NFR-003], [BR-042], [ADR-0004], [ADR-0005]

@@ -1,6 +1,6 @@
 # Spec 003: editing-history
 
-> Status: Draft · Implements: [BR-010], [BR-042], [NFR-003] · Decisions: [ADR-0005], [ADR-0007], [ADR-0014]
+> Status: Draft · Implements: [BR-010], [BR-042], [NFR-003] · Decisions: [ADR-0016] (supersedes [ADR-0005]), [ADR-0007], [ADR-0014]
 > Repos: arch-api, arch-web · Last reviewed: 2026-11-08
 
 ## Summary
@@ -24,11 +24,14 @@ any path, is written to the append-only change log, and anyone can read a node's
 - `POST /api/v1/nodes` → `201` node; `PATCH /api/v1/nodes/{environment}/{id}` (`If-Match: <version>`) → `200`; `DELETE /api/v1/nodes/{environment}/{id}` → `204`.
 - `POST /api/v1/edges` → `201`; `PATCH /api/v1/edges/{uid}` (`If-Match`) → `200`; `DELETE /api/v1/edges/{uid}` → `204`.
 - `GET /api/v1/history?entity=node&environment=&id=&limit=&cursor=` → change entries (including the node's edges).
-- Errors: `401`, `403`, `404`, `409 /problems/conflict` (duplicate id or edge), `412 /problems/stale`, `428 /problems/precondition-required` (no `If-Match`), `422 /problems/validation` or `/problems/secret-detected`.
+- Errors: `401`, `403`, `404`, `409 /problems/conflict` (duplicate id or edge), `409 /problems/in-use` (deleting a team that owns nodes or an environment that holds nodes; the body adds an integer member `count`, the number of nodes), `412 /problems/stale` (including `*`, weak or malformed `If-Match`), `428 /problems/precondition-required` (no `If-Match` on node or edge PATCH/DELETE), `422 /problems/validation` or `/problems/secret-detected`.
+- Writes return the entity's version in `ETag` (`"1"` on create). CORS allows the `If-Match` request header and exposes `ETag`, so the browser app can use them.
 
 ## Data
 
-- `change_log(id bigserial, at timestamptz, actor text, actor_name text, actor_kind user|service, source, entity node|edge|type|team|environment, entity_key text, action create|update|delete, before jsonb, after jsonb)`, indexed by `(entity, entity_key, at desc)`. Kept forever ([NFR-003]).
+- `change_log(id bigserial, at timestamptz, actor text, actor_name text, actor_kind user|service, source, entity node|edge|type|team|environment, entity_key text, action create|update|delete, before jsonb, after jsonb)`, indexed by `(entity, entity_key, at desc, id desc)`. Kept forever ([NFR-003], [ADR-0016]).
+- `entity_key` formats: node `<environment>/<id>`, edge `<uid>`, team `<id>`, environment `<id>`. `before`/`after` hold the entity's API JSON; `before` is null on create, `after` null on delete.
+- A node's edge history uses two partial expression indexes `WHERE entity = 'edge'`: `((coalesce(after, before)->>'environment'), (coalesce(after, before)->>'from'), at desc, id desc)` and the same with `'to'`. An edge's environment, `from` and `to` never change, so `coalesce(after, before)` is stable.
 
 ## Non-functional
 
