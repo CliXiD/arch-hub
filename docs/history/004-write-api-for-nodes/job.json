@@ -1,0 +1,70 @@
+{
+  "id": "004-write-api-for-nodes",
+  "issue": 5,
+  "title": "Write API for nodes, edges, teams and environments with change log",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/5",
+  "branch": "factory/004-write-api-for-nodes",
+  "stage": "merged",
+  "round": 1,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 10.51,
+  "started": "2026-11-08T22:38:56Z",
+  "ended": "2026-11-08T23:23:59Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "6a77f4713320f537c6d2743e1f51c33c5c57c0ed",
+      "prs": {
+        "main": {
+          "pr": 5,
+          "url": "https://github.com/CliXiD/arch-api/pull/5",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "c8abe85ad80bb91edae54ba42c7e95e3ff6061ce",
+      "prs": {
+        "main": {
+          "pr": 5,
+          "url": "https://github.com/CliXiD/arch-web/pull/5",
+          "merged": true
+        }
+      }
+    }
+  }
+}
