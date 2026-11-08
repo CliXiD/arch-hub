@@ -1,0 +1,255 @@
+{
+  "realm": "arch",
+  "enabled": true,
+  "displayName": "Architecture E2E (local dev)",
+  "sslRequired": "none",
+  "accessTokenLifespan": 300,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "viewer",
+        "description": "Read everything [SPEC-identity-access-04]"
+      },
+      {
+        "name": "editor",
+        "description": "Edit nodes of own teams [SPEC-identity-access-05]",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "viewer"
+          ]
+        }
+      },
+      {
+        "name": "admin",
+        "description": "Types, teams, settings [SPEC-identity-access-06]",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "editor"
+          ]
+        }
+      },
+      {
+        "name": "default-roles-arch",
+        "description": "Every user is a viewer",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "viewer"
+          ]
+        }
+      }
+    ]
+  },
+  "defaultRole": {
+    "name": "default-roles-arch"
+  },
+  "groups": [
+    {
+      "name": "platform"
+    },
+    {
+      "name": "payments"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "arch-web",
+      "name": "Architecture E2E web",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "teams",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "teams",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-arch-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "arch-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "arch-api",
+      "name": "Architecture E2E API (audience only)",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "arch-cli",
+      "name": "arch CLI (device login)",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "teams",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "teams",
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-arch-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "arch-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "arch-ci-platform",
+      "name": "CI service account for team platform",
+      "publicClient": false,
+      "secret": "dev-ci-secret",
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-arch-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "arch-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "teams",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "teams",
+            "claim.value": "[\"platform\"]",
+            "jsonType.label": "JSON",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "viewer",
+      "email": "viewer@local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Viewer",
+      "lastName": "Local",
+      "groups": [],
+      "realmRoles": [
+        "default-roles-arch"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "editor",
+      "email": "editor@local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Editor",
+      "lastName": "Local",
+      "groups": [
+        "/platform"
+      ],
+      "realmRoles": [
+        "editor",
+        "default-roles-arch"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "admin",
+      "email": "admin@local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "Local",
+      "groups": [
+        "/platform"
+      ],
+      "realmRoles": [
+        "admin",
+        "default-roles-arch"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "service-account-arch-ci-platform",
+      "enabled": true,
+      "serviceAccountClientId": "arch-ci-platform",
+      "realmRoles": [
+        "editor",
+        "default-roles-arch"
+      ]
+    }
+  ]
+}

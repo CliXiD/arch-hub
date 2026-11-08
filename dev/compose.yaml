@@ -5,6 +5,110 @@
 #   - an app that other repos call gets a profile named after its repo key, running from
 #     ${<KEY>_DIR:-../repos/<path>} with node_modules (or venv) in a named volume
 #   - only local dummy credentials; dev/env/<key>.env holds the matching app settings
+#
+# Profiles: (none) postgres + keycloak · tracing → jaeger · arch-api → the API · arch-web → the SPA
 name: architecture-e2e-dev
 
-services: {}
+services:
+  # [ADR-0004] PostgreSQL 16: database `arch` for arch-api, `keycloak` for Keycloak.
+  postgres:
+    image: docker.io/library/postgres:16.14-alpine
+    environment:
+      POSTGRES_USER: arch
+      POSTGRES_PASSWORD: arch
+      POSTGRES_DB: arch
+    ports: ["5432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arch -d arch && psql -U arch -d keycloak -c 'select 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # [ADR-0008] Keycloak, realm `arch` imported at start. Issuer is always
+  # http://localhost:8180/realms/arch (KC_HOSTNAME), for the browser and containers alike;
+  # containers fetch keys over the backchannel at http://keycloak:8080.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: arch
+      KC_DB_PASSWORD: arch
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports: ["8180:8080"]
+    volumes:
+      # The hub's dev realm until arch-deploy ships its own export:
+      # ARCH_REALM_FILE=../repos/arch-deploy/keycloak/arch-realm.json dev/bin/stack up
+      - ${ARCH_REALM_FILE:-./keycloak/arch-realm.json}:/opt/keycloak/data/import/arch-realm.json:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # [ADR-0009] [ADR-0011] Jaeger v2 all-in-one: UI :16686, OTLP gRPC :4317, HTTP :4318.
+  jaeger:
+    image: docker.io/jaegertracing/jaeger:2.22.0
+    profiles: ["tracing"]
+    ports: ["16686:16686", "4317:4317", "4318:4318"]
+
+  # [ADR-0003] [ADR-0013] arch-api (Go) from the repo or a factory worktree (ARCH_API_DIR).
+  arch-api:
+    image: docker.io/library/golang:1.27.2-alpine
+    profiles: ["arch-api"]
+    working_dir: /src
+    command: ["/bin/sh", "/dev-scripts/start.sh"]
+    env_file: env/arch-api.env
+    environment:
+      DATABASE_URL: postgres://arch:arch@postgres:5432/arch?sslmode=disable
+      OIDC_JWKS_URL: http://keycloak:8080/realms/arch/protocol/openid-connect/certs
+      HTTP_ADDR: ":8080"
+      METRICS_ADDR: ":9090"
+      CGO_ENABLED: "0"
+      GOTOOLCHAIN: auto
+    ports: ["8080:8080", "9090:9090"]
+    volumes:
+      - ${ARCH_API_DIR:-../repos/arch-api}:/src
+      - ./arch-api:/dev-scripts:ro
+      - go-mod:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    depends_on:
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+
+  # [ADR-0007] [ADR-0013] arch-web (Vite dev server) from the repo or a worktree (ARCH_WEB_DIR).
+  arch-web:
+    image: docker.io/library/node:26.12.1-alpine
+    profiles: ["arch-web"]
+    working_dir: /app
+    command: ["/bin/sh", "/dev-scripts/start.sh"]
+    env_file: env/arch-web.env
+    environment:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      CI: "true"
+    ports: ["5173:5173"]
+    volumes:
+      - ${ARCH_WEB_DIR:-../repos/arch-web}:/app
+      - ./arch-web:/dev-scripts:ro
+      - web-node-modules:/app/node_modules
+      - pnpm-store:/root/.local/share/pnpm/store
+    depends_on:
+      keycloak: { condition: service_healthy }
+
+volumes:
+  postgres-data:
+  go-mod:
+  go-build:
+  web-node-modules:
+  pnpm-store:

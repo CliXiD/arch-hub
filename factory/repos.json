@@ -15,7 +15,11 @@
         "migrations/*"
       ],
       "auto_merge": false,
-      "stack": "unknown"
+      "stack": "unknown",
+      "env": {
+        "example": ".env.example",
+        "target": ".env"
+      }
     },
     "arch-web": {
       "path": "repos/arch-web",
@@ -29,7 +33,11 @@
         ".github/*"
       ],
       "auto_merge": false,
-      "stack": "unknown"
+      "stack": "unknown",
+      "env": {
+        "example": ".env.example",
+        "target": ".env"
+      }
     },
     "arch-deploy": {
       "path": "repos/arch-deploy",
