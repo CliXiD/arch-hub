@@ -14,7 +14,7 @@
         ".github/*",
         "migrations/*"
       ],
-      "auto_merge": false,
+      "auto_merge": true,
       "stack": "unknown",
       "env": {
         "example": ".env.example",
@@ -32,7 +32,7 @@
       "protected_paths": [
         ".github/*"
       ],
-      "auto_merge": false,
+      "auto_merge": true,
       "stack": "unknown",
       "env": {
         "example": ".env.example",
