@@ -1,6 +1,6 @@
 # ADR-0007: Frontend stack
 
-- Status: Accepted
+- Status: Accepted (runtime version superseded by [ADR-0013])
 - Date: 2026-11-08
 - Deciders: khajonpot, /hub-init 2026-11-08
 - Relates to: [BR-020], [BR-021], [BR-030], [NFR-005], [NFR-006]

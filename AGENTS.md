@@ -90,9 +90,32 @@ Checks are lint, typecheck, unit tests and build only: no services, no watch mod
 
 ## Local services
 
-<!-- /hub-dev-stack fills this: services, ports, profiles, credentials (local dummies),
-     how to run each app against them. -->
-`dev/bin/stack up [profile ...]`, `dev/bin/apply-env [key ...]`. TODO: run /hub-dev-stack.
+`dev/bin/stack up [profile ...]` (podman, docker fallback), `down`, `reset` (drops data),
+`ps`, `logs <svc>`. `dev/bin/apply-env [key ...]` copies `dev/env/<key>.env` to the repo's `.env`
+(`--to <worktree> <key>` for a factory worktree). Built from [ADR-0004], [ADR-0008], [ADR-0009], [ADR-0013].
+
+| service | profile | host ports | dummy credentials |
+|---|---|---|---|
+| postgres 16.14 | — | 5432 | `arch`/`arch`, databases `arch`, `keycloak` |
+| keycloak 26.8.0 | — | 8180 (admin console at /admin) | admin `admin`/`admin` |
+| jaeger 2.22.0 | `tracing` | 16686 UI, 4317 gRPC, 4318 HTTP | — |
+| arch-api (golang 1.27) | `arch-api` | 8080 API, 9090 metrics | — |
+| arch-web (node 26, Vite) | `arch-web` | 5173 | — |
+
+- **Realm `arch`** (`dev/keycloak/arch-realm.json`, hub-owned until `arch-deploy` ships one;
+  `ARCH_REALM_FILE=<path>` overrides): users `viewer`, `editor` (team `platform`), `admin`, all
+  password `password`; clients `arch-web` (public, PKCE, `http://localhost:5173/*`), `arch-api`
+  (audience), `arch-cli` (device flow), `arch-ci-platform` (secret `dev-ci-secret`, teams
+  `[platform]`). Issuer is always `http://localhost:8180/realms/arch`; containers fetch keys from
+  `http://keycloak:8080/...` (`OIDC_JWKS_URL`).
+- **Run an app natively** (usual): `dev/bin/stack up`, `dev/bin/apply-env <key>`, then the repo's
+  dev command (`go run ./cmd/arch-api serve`, `pnpm dev`). **As a container** (to work on a caller):
+  `dev/bin/stack up arch-api`. A worktree instead of `repos/`: `ARCH_API_DIR=<path>` /
+  `ARCH_WEB_DIR=<path>`. Entry scripts: `dev/arch-api/start.sh` (migrate + serve),
+  `dev/arch-web/start.sh` (pnpm install + Vite).
+- **Tracing:** `dev/bin/stack up tracing`, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`.
+- **New repos:** the first commit in `arch-api` and `arch-web` must add a `.gitignore` covering
+  `.env` before anything else; `apply-env` has already put a dummy `.env` there.
 
 ## Factory notes
 

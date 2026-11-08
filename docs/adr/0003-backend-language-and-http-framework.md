@@ -1,6 +1,6 @@
 # ADR-0003: Backend language and HTTP framework
 
-- Status: Accepted
+- Status: Accepted (runtime version superseded by [ADR-0013])
 - Date: 2026-11-08
 - Deciders: khajonpot, /hub-init 2026-11-08
 - Relates to: [BR-011], [BR-030], [NFR-005]
