@@ -1,0 +1,70 @@
+{
+  "id": "002-model-tables-seeds-and",
+  "issue": 4,
+  "title": "Model tables, seeds and read API",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/4",
+  "branch": "factory/002-model-tables-seeds-and",
+  "stage": "merged",
+  "round": 2,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 9.39,
+  "started": "2026-11-08T16:45:27Z",
+  "ended": "2026-11-08T22:29:09Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "7dd2588e3dcaa4c18af7e15a82cb7331904e0811",
+      "prs": {
+        "main": {
+          "pr": 3,
+          "url": "https://github.com/CliXiD/arch-api/pull/3",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "bf923f17e283c684896cdb76b23334dd981f0ea9",
+      "prs": {
+        "main": {
+          "pr": 3,
+          "url": "https://github.com/CliXiD/arch-web/pull/3",
+          "merged": true
+        }
+      }
+    }
+  }
+}
