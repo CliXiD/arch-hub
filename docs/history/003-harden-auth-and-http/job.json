@@ -1,0 +1,75 @@
+{
+  "id": "003-harden-auth-and-http",
+  "issue": 7,
+  "title": "Harden auth and HTTP server after the walking skeleton",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/7",
+  "branch": "factory/003-harden-auth-and-http",
+  "stage": "merged",
+  "round": 2,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "ui",
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 7.98,
+  "started": "2026-11-08T17:14:28Z",
+  "ended": "2026-11-08T22:38:46Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "ux": "sonnet",
+    "ui": "haiku",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "f2622ac98957f8247b350970ea994a4d7c3bfd16",
+      "prs": {
+        "main": {
+          "pr": 4,
+          "url": "https://github.com/CliXiD/arch-api/pull/4",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "0031c52e6ad5e390f33600e7eed261983ad3642e",
+      "prs": {
+        "main": {
+          "pr": 4,
+          "url": "https://github.com/CliXiD/arch-web/pull/4",
+          "merged": true
+        }
+      }
+    }
+  }
+}
