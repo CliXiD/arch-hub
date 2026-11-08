@@ -6,6 +6,7 @@ docs/adr say how the system works now. Commits carry `Factory-Job: <job-id>` tra
 
 | Job | Issue | Title | Outcome | Repos | Ended |
 |---|---|---|---|---|---|
+| [004-write-api-for-nodes](004-write-api-for-nodes/README.md) | #5 | Write API for nodes, edges, teams and environments with change log | merged | arch-api, arch-web | 2026-11-08 |
 | [003-harden-auth-and-http](003-harden-auth-and-http/README.md) | #7 | Harden auth and HTTP server after the walking skeleton | merged | arch-api, arch-web | 2026-11-08 |
 | [002-model-tables-seeds-and](002-model-tables-seeds-and/README.md) | #4 | Model tables, seeds and read API | merged | arch-api, arch-web | 2026-11-08 |
 | [001-walking-skeleton-sign-in](001-walking-skeleton-sign-in/README.md) | #3 | Walking skeleton: sign-in, /api/v1/me and health | merged | arch-api, arch-web | 2026-11-08 |
