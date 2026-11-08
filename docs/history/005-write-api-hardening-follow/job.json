@@ -1,0 +1,53 @@
+{
+  "id": "005-write-api-hardening-follow",
+  "issue": 14,
+  "title": "Write API hardening follow-ups from job 004",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/14",
+  "branch": "factory/005-write-api-hardening-follow",
+  "stage": "merged",
+  "round": 1,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS"
+  },
+  "cost_usd": 3.36,
+  "started": "2026-11-08T23:28:13Z",
+  "ended": "2026-11-08T23:56:41Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "09d90063e37e3b8f43803c7bf40763f20024586e",
+      "prs": {
+        "main": {
+          "pr": 6,
+          "url": "https://github.com/CliXiD/arch-api/pull/6",
+          "merged": true
+        }
+      }
+    }
+  }
+}
