@@ -86,6 +86,11 @@ The gate runs `factory/checks/<key>.sh` from the hub inside each repo's worktree
 `FACTORY_HUB`, `FACTORY_REPO_KEY` and `FACTORY_BASE` set. Run one by hand from a repo:
 `FACTORY_HUB=<hub> FACTORY_REPO_KEY=<key> FACTORY_BASE=<base> bash <hub>/factory/checks/<key>.sh`.
 Checks are lint, typecheck, unit tests and build only: no services, no watch mode.
+While a repo is still empty (no `go.mod`, `package.json` or `charts/*/Chart.yaml`) its check
+prints "nothing to check" and passes; once code lands the full checks run. They expect
+`go tool golangci-lint` and `make openapi-check` in `arch-api`, and the pnpm scripts `lint`,
+`typecheck`, `test` (run mode) and `build` in `arch-web`. Run `factory/bin/add-repo --redetect
+<key>` after a repo's first code merges so its stack shows up in the table above.
 `factory/bin/setup --checks` runs them all on each repo's base branch.
 
 ## Local services
@@ -96,7 +101,7 @@ Checks are lint, typecheck, unit tests and build only: no services, no watch mod
 
 | service | profile | host ports | dummy credentials |
 |---|---|---|---|
-| postgres 16.14 | — | 5432 | `arch`/`arch`, databases `arch`, `keycloak` |
+| postgres 16.14 | — | 5432 | `arch`/`arch` (owner, migrations), `arch_app`/`arch_app` (runtime, [ADR-0014]); databases `arch`, `keycloak` |
 | keycloak 26.8.0 | — | 8180 (admin console at /admin) | admin `admin`/`admin` |
 | jaeger 2.22.0 | `tracing` | 16686 UI, 4317 gRPC, 4318 HTTP | — |
 | arch-api (golang 1.27) | `arch-api` | 8080 API, 9090 metrics | — |

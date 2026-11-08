@@ -1,6 +1,6 @@
 # Spec 003: editing-history
 
-> Status: Draft · Implements: [BR-010], [BR-042], [NFR-003] · Decisions: [ADR-0005], [ADR-0007]
+> Status: Draft · Implements: [BR-010], [BR-042], [NFR-003] · Decisions: [ADR-0005], [ADR-0007], [ADR-0014]
 > Repos: arch-api, arch-web · Last reviewed: 2026-11-08
 
 ## Summary
@@ -17,14 +17,14 @@ any path, is written to the append-only change log, and anyone can read a node's
 - **SPEC-editing-history-05** If someone else changed the item since the form was opened (`412`), the form says so and offers to reload, showing the newer values. [BR-010]
 - **SPEC-editing-history-06** Every create, update and delete of a node, edge, type, team or environment writes one `change_log` row in the same transaction, with the actor, actor kind, source, and the before and after values. A failed write leaves no row. [BR-042] [NFR-003]
 - **SPEC-editing-history-07** A node's History tab lists its changes and those of its edges, newest first, in pages of 50. Each entry shows when, who and what changed (a field diff), and its source. With no changes yet it shows "No changes recorded". [BR-042]
-- **SPEC-editing-history-08** The API's database role has no `UPDATE` or `DELETE` grant on `change_log`. A migration test checks this. [NFR-003]
+- **SPEC-editing-history-08** The API's database role has no `UPDATE` or `DELETE` grant on `change_log`, and a trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` on it; migrations run as a separate owner role ([ADR-0014]). An integration test checks both. [NFR-003]
 
 ## Interfaces
 
 - `POST /api/v1/nodes` → `201` node; `PATCH /api/v1/nodes/{environment}/{id}` (`If-Match: <version>`) → `200`; `DELETE /api/v1/nodes/{environment}/{id}` → `204`.
 - `POST /api/v1/edges` → `201`; `PATCH /api/v1/edges/{uid}` (`If-Match`) → `200`; `DELETE /api/v1/edges/{uid}` → `204`.
 - `GET /api/v1/history?entity=node&environment=&id=&limit=&cursor=` → change entries (including the node's edges).
-- Errors: `401`, `403`, `404`, `409 /problems/conflict` (duplicate id or edge), `412 /problems/stale`, `422 /problems/validation` or `/problems/secret-detected`.
+- Errors: `401`, `403`, `404`, `409 /problems/conflict` (duplicate id or edge), `412 /problems/stale`, `428 /problems/precondition-required` (no `If-Match`), `422 /problems/validation` or `/problems/secret-detected`.
 
 ## Data
 
