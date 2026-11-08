@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Map intake's REPOS, RISK and SURFACES to the job's repos and reviewers.
+# Usage: route <job-id>
+# Reads intake.md through job.json, applies config.json routing, surface_reviewers
+# and multi_repo_reviewers plus repos.json `implies`, and records the result.
+set -euo pipefail
+exec "$(dirname "$0")/job" route "$@"

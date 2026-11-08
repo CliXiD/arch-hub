@@ -1,0 +1,10 @@
+# Local services for this hub's repos. Run with dev/bin/stack (podman first, docker fallback).
+# /hub-dev-stack fills this in from what the repos need. Conventions:
+#   - fully qualified images (docker.io/library/postgres:17), pinned tags, healthchecks
+#   - services every repo needs have no profile and always start
+#   - an app that other repos call gets a profile named after its repo key, running from
+#     ${<KEY>_DIR:-../repos/<path>} with node_modules (or venv) in a named volume
+#   - only local dummy credentials; dev/env/<key>.env holds the matching app settings
+name: architecture-e2e-dev
+
+services: {}

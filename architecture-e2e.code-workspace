@@ -1,0 +1,11 @@
+{
+  "folders": [
+    { "path": ".", "name": "hub" }
+  ],
+  "settings": {
+    "files.exclude": { "repos": true, ".worktrees": true },
+    "search.exclude": { "**/node_modules": true, "**/.next": true, "**/.svelte-kit": true, "**/dist": true, "**/.venv": true, "**/target": true },
+    "git.autoRepositoryDetection": "subFolders",
+    "git.repositoryScanMaxDepth": 2
+  }
+}

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Copy the local env files from dev/env/<key>.env into the repos, where factory/repos.json
+# `env.target` says (e.g. .env or .env.local). Repos without an env target are skipped.
+#
+#   dev/bin/apply-env [<key> ...]          into repos/ (default: every repo with an env file)
+#   dev/bin/apply-env --to <dir> <key>     into another checkout, e.g. a factory worktree
+#   --force                                replace a different existing file (keeps a .bak copy)
+set -eu
+DEV="$(cd "$(dirname "$0")/.." && pwd)"
+HUB="$(cd "$DEV/.." && pwd)"
+force=0; to=""; keys=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force) force=1 ;;
+    --to) to="$2"; shift ;;
+    -*) sed -n '2,9p' "$0"; exit 1 ;;
+    *) keys="$keys $1" ;;
+  esac
+  shift
+done
+python3 - "$HUB" "$force" "$to" $keys <<'PY'
+import filecmp, json, shutil, sys, time
+from pathlib import Path
+hub, force, to, keys = Path(sys.argv[1]), sys.argv[2] == "1", sys.argv[3], sys.argv[4:]
+repos = json.loads((hub / "factory/repos.json").read_text())["repos"]
+if to and len(keys) != 1:
+    sys.exit("apply-env: --to takes exactly one repo key")
+for key in keys or list(repos):
+    r = repos.get(key)
+    if r is None:
+        print(f"skip     {key}: not in factory/repos.json"); continue
+    target = (r.get("env") or {}).get("target")
+    src = hub / "dev/env" / f"{key}.env"
+    if not target or not src.exists():
+        if keys: print(f"skip     {key}: no env.target in repos.json or no dev/env/{key}.env")
+        continue
+    d = Path(to) if to else hub / r["path"]
+    if not d.is_dir():
+        print(f"skip     {key}: {d} not found"); continue
+    dest = d / target
+    if dest.exists() and filecmp.cmp(src, dest, shallow=False):
+        print(f"same     {key}: {dest}"); continue
+    if dest.exists() and not force:
+        print(f"keep     {key}: {dest} exists and differs (--force replaces it, keeping a .bak copy)"); continue
+    if dest.exists():
+        shutil.copy2(dest, dest.with_name(dest.name + time.strftime(".bak-%Y%m%d%H%M%S")))
+    shutil.copy2(src, dest)
+    print(f"wrote    {key}: {dest}")
+PY

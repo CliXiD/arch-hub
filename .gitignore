@@ -1,0 +1,10 @@
+# the repos have their own remotes
+/repos/
+/.worktrees/
+# factory runtime state
+/factory/jobs/*
+!/factory/jobs/.gitkeep
+/factory/drafts/
+.claude/settings.local.json
+.DS_Store
+__pycache__/

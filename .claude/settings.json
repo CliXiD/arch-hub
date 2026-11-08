@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./repos/**/.env)",
+      "Read(./repos/**/.env.local)",
+      "Read(./repos/**/.env.*.local)",
+      "Read(./repos/**/.env.production)",
+      "Read(./repos/**/.env.development)",
+      "Read(./.worktrees/**/.env.local)",
+      "Read(./.worktrees/**/.env.production)"
+    ]
+  }
+}

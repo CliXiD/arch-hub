@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""The deterministic gate: do the job's branches pass every repo's checks?
+
+Usage:
+  gate <job-id>            write round-N/checks.md; exit 0 on PASS, 1 on FAIL
+  gate <job-id> --merge    same, as round-N/merge-checks.md (job merge runs it)
+  gate --hook              builder Stop hook: run the checks once, exit 2 on failure
+
+For every repo the job changed, the gate runs that repo's checks script from
+the hub's main checkout (factory/checks/<key>.sh, named in repos.json) inside
+the repo's worktree, so a branch can't change the checks it is judged by. A
+repo fails when its branch modifies or deletes an existing file matching that
+repo's `protected_paths` (fnmatch, `*` also matches `/`). Adding files is fine.
+
+Cross-repo rules from repos.json `rules` run last. Each rule is a pair:
+  "rules": [{"name": "migration-mirror",
+             "a": {"repo": "api", "paths": ["src/migrations/*"]},
+             "b": {"repo": "db",  "paths": ["sql/*.sql"]},
+             "both_ways": true,
+             "why": "every TypeORM migration has a SQL mirror in db"}]
+A job that adds files matching `a` must also add files matching `b` (and the
+reverse when both_ways is true). Add the other repo with `job add-repo`.
+"""
+
+import fnmatch
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HUB = Path(__file__).resolve().parents[2]
+FACTORY = HUB / "factory"
+REPOS_FILE = json.loads((FACTORY / "repos.json").read_text())
+REPOS = REPOS_FILE["repos"]
+ORDER = REPOS_FILE["merge_order"]
+RULES = REPOS_FILE.get("rules", [])
+TAIL = 60
+
+
+def die(msg):
+    print(f"gate: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def git(worktree, *args):
+    res = subprocess.run(["git", *args], cwd=worktree, capture_output=True, text=True)
+    if res.returncode != 0:
+        die(f"`git {' '.join(args)}` in {worktree} failed: {res.stderr.strip()}")
+    return res.stdout
+
+
+def diff_status(e):
+    """[(status letter, path)] of the branch against its base; renames give the old path."""
+    out = []
+    for line in git(e["worktree"], "diff", "--name-status", f"origin/{e['base']}...HEAD").splitlines():
+        status, *paths = line.split("\t")
+        out.append((status[0], paths[0]))
+        if status[0] in "RC" and len(paths) > 1:
+            out.append(("A", paths[1]))
+    return out
+
+
+def matches(path, patterns):
+    return any(fnmatch.fnmatch(path, p) for p in patterns)
+
+
+def protected_changes(e):
+    patterns = REPOS[e["key"]].get("protected_paths", [])
+    return [f"{s} {p}" for s, p in diff_status(e) if s != "A" and matches(p, patterns)]
+
+
+def run_checks(e):
+    script = REPOS[e["key"]].get("checks")
+    if not script:
+        return 0, "(no checks configured for this repo)\n", 0
+    start = time.monotonic()
+    env = dict(os.environ, FACTORY_HUB=str(HUB), FACTORY_REPO_KEY=e["key"], FACTORY_BASE=e["base"], CI="true")
+    res = subprocess.run(["bash", str(HUB / script)], cwd=e["worktree"], capture_output=True, text=True, env=env)
+    return res.returncode, res.stdout + res.stderr, int(time.monotonic() - start)
+
+
+def changed_entries(job):
+    return [job["repos"][k] for k in ORDER if k in job["repos"] and job["repos"][k].get("changed")]
+
+
+def added(e, patterns):
+    return [p for s, p in diff_status(e) if s == "A" and matches(p, patterns)]
+
+
+def rule_problems(job):
+    problems = []
+    for rule in RULES:
+        sides = []
+        for side in ("a", "b"):
+            e = job["repos"].get(rule[side]["repo"])
+            sides.append(added(e, rule[side]["paths"]) if e and e.get("changed") else [])
+        pairs = [(0, 1), (1, 0)] if rule.get("both_ways") else [(0, 1)]
+        for x, y in pairs:
+            if sides[x] and not sides[y]:
+                rx, ry = rule["ab"[x]], rule["ab"[y]]
+                problems.append(
+                    f"{rule['name']}: {rx['repo']} adds {', '.join(sides[x])} but {ry['repo']} adds nothing under "
+                    f"{', '.join(ry['paths'])}. {rule.get('why', '')} (factory/bin/job add-repo if {ry['repo']} "
+                    f"isn't in the job yet)".strip())
+    return problems
+
+
+def gate(job_id, merge):
+    job = json.loads((FACTORY / "jobs" / job_id / "job.json").read_text())
+    if job["round"] < 1:
+        die(f"{job_id} hasn't started a build round")
+    entries = changed_entries(job)
+    if not entries:
+        die(f"{job_id} has no changed repo; advance it to gate first")
+    rd = FACTORY / "jobs" / job_id / f"round-{job['round']}"
+    name = "merge-checks" if merge else "checks"
+    commits, summary, sections, failed = [], [], [], []
+    for e in entries:
+        commit = git(e["worktree"], "rev-parse", "HEAD").strip()
+        commits.append(f"{e['key']}={commit}")
+        protected = protected_changes(e)
+        code, log, seconds = run_checks(e)
+        (rd / f"{name}-{e['key']}.log").write_text(log)
+        ok = code == 0 and not protected
+        if not ok:
+            failed.append(e["key"])
+        summary.append(f"{e['key']}: {'PASS' if ok else 'FAIL'} — checks exit {code} in {seconds}s"
+                       + (f", protected changed: {', '.join(protected)}" if protected else "")
+                       + f", commit {commit[:7]}")
+        tail = "\n".join(log.rstrip().splitlines()[-TAIL:])
+        sections.append(
+            f"## {e['key']} ({REPOS[e['key']]['path']})\n"
+            f"Protected paths: {', '.join(protected) if protected else 'none changed'}.\n"
+            f"Checks: exit {code} in {seconds}s. Last {TAIL} lines of {name}-{e['key']}.log:\n\n```\n{tail}\n```\n")
+    problems = rule_problems(job)
+    if problems:
+        failed.append("rules")
+        summary.append("cross-repo rules: " + "; ".join(p.split(":")[0] for p in problems))
+        sections.append("## Cross-repo rules\n" + "\n".join(f"- {p}" for p in problems) + "\n")
+    verdict = "FAIL" if failed else "PASS"
+    if merge:
+        summary.append("branches synced with their latest base before merging")
+    (rd / f"{name}.md").write_text(
+        f"GATE: {verdict}\nCOMMITS: {' '.join(commits)}\n\n"
+        "## Summary\n" + "\n".join(f"- {s}" for s in summary) + "\n\n" + "\n".join(sections))
+    print(f"GATE: {verdict} ({job_id} round {job['round']}" + (f", failed: {', '.join(failed)}" if failed else "") + ")")
+    sys.exit(0 if verdict == "PASS" else 1)
+
+
+def hook():
+    event = json.load(sys.stdin)
+    if event.get("stop_hook_active"):
+        sys.exit(0)  # one nudge per stop; the gate decides
+    try:
+        with open(Path(event["agent_transcript_path"]).expanduser()) as f:
+            content = json.loads(f.readline())["message"]["content"]
+        prompt = content if isinstance(content, str) else " ".join(b.get("text", "") for b in content)
+        job_id = prompt.split("Job: ", 1)[1].split(".", 1)[0]
+        job = json.loads((FACTORY / "jobs" / job_id / "job.json").read_text())
+    except (KeyError, IndexError, OSError, ValueError):
+        sys.exit(0)  # not a factory builder; nothing to nudge
+    failures = []
+    for k in ORDER:
+        e = job["repos"].get(k)
+        if not e or not Path(e["worktree"]).exists():
+            continue
+        ahead = subprocess.run(["git", "rev-list", "--count", f"origin/{e['base']}..HEAD"],
+                               cwd=e["worktree"], capture_output=True, text=True).stdout.strip()
+        if ahead in ("", "0"):
+            continue
+        code, log, _ = run_checks(e)
+        if code != 0:
+            failures.append(f"### {k} (exit {code})\n" + "\n".join(log.rstrip().splitlines()[-30:]))
+    if failures:
+        print("The repo checks fail in your worktrees. The gate will reject this build. Fix them, or write "
+              "STATUS: BLOCKED in build.md if you can't.\n\n" + "\n\n".join(failures), file=sys.stderr)
+        sys.exit(2)
+
+
+def main(argv):
+    if argv == ["--hook"]:
+        hook()
+    elif len(argv) == 1 and not argv[0].startswith("-"):
+        gate(argv[0], merge=False)
+    elif len(argv) == 2 and argv[1] == "--merge":
+        gate(argv[0], merge=True)
+    else:
+        die(__doc__.strip())
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

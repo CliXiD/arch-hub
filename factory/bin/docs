@@ -1,0 +1,379 @@
+#!/usr/bin/env python3
+"""Keep the hub's documents (docs/) consistent: sources, snapshots, IDs and citations.
+
+Usage:
+  docs list [--stale]                     sources with kind, link, last fetched, age (only stale ones)
+  docs add-source --kind K --ref REF --title T [--notes N]
+                                          register a source; prints its id (or the existing one for REF)
+  docs record <S-id> <file>               store <file> as the source's snapshot; prints new | changed | unchanged
+                                          (a changed snapshot keeps the previous one as S-xxx.prev.md)
+  docs diff <S-id>                        unified diff between the previous and current snapshot
+  docs cites <id>                         every place (docs/history too) in docs/, AGENTS.md and CLAUDE.md that cites <id> ([S-001], [BR-004], ...)
+  docs adr-new "<title>"                  copy the ADR template to the next number; prints the path
+  docs spec-new "<area>" [--at NNN]       copy the spec template to docs/specs/NNN_<area>.md (next number, or NNN)
+  docs specs                              the specs in reading order: number, area, status, title
+  docs index                              write docs/specs/README.md, the reading-order table of contents
+  docs check                              validate everything below; exit 1 on errors
+
+Kinds: prompt (text the user gave), url, confluence, jira, wiki, gdrive, file, repo, meeting, other.
+
+`check` errors: a citation to an id that is defined nowhere, an id defined twice, a source
+without a snapshot, a snapshot edited by hand (hash mismatch), an ADR without a Status line or
+out of sequence, a spec not named NNN_<area>.md or sharing its number with another, a
+SPEC-<area>-xx id defined outside docs/specs/NNN_<area>.md. Warnings: sources nothing cites, sources older than docs.stale_days in
+factory/config.json (prompt and file sources never go stale), BRD items without a citation,
+gaps in the spec numbers, docs/specs/README.md out of date (run docs index).
+"""
+
+import difflib
+import hashlib
+import json
+import re
+import shutil
+import sys
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+HUB = Path(__file__).resolve().parents[2]
+DOCS = HUB / "docs"
+SOURCES = DOCS / "sources"
+REGISTRY = SOURCES / "sources.json"
+KINDS = {"prompt", "url", "confluence", "jira", "wiki", "gdrive", "file", "repo", "meeting", "other"}
+NEVER_STALE = {"prompt", "file", "meeting"}
+CITE = re.compile(r"\[((?:S-\d{3,})|(?:BR|NFR|G)-\d{2,}|(?:ADR-\d{4})|(?:SPEC-[a-z0-9-]+-\d{2,}))\]")
+SPEC_FILE = re.compile(r"^(\d{3})_([a-z0-9][a-z0-9-]*)\.md$")
+DEFINE = re.compile(r"^\s*(?:[-*]\s+|#{1,6}\s+)\*\*((?:BR|NFR|G)-\d{2,}|SPEC-[a-z0-9-]+-\d{2,})\*\*", re.M)
+
+
+def die(msg):
+    print(f"docs: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def load():
+    if not REGISTRY.exists():
+        return {"sources": []}
+    return json.loads(REGISTRY.read_text())
+
+
+def save(reg):
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(reg, indent=2, ensure_ascii=False) + "\n")
+
+
+def find(reg, sid):
+    for s in reg["sources"]:
+        if s["id"] == sid:
+            return s
+    die(f"no source {sid}; see `docs list`")
+
+
+def normalize(text):
+    return "\n".join(line.rstrip() for line in text.replace("\r\n", "\n").strip().splitlines()) + "\n"
+
+
+def sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def config():
+    try:
+        return json.loads((HUB / "factory/config.json").read_text()).get("docs", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def age_days(s):
+    if not s.get("fetched_at"):
+        return None
+    t = datetime.fromisoformat(s["fetched_at"].replace("Z", "+00:00"))
+    return (datetime.now(timezone.utc) - t).days
+
+
+def doc_files(history=False):
+    """The documents checked for IDs and citations. docs/history (finished jobs) is history:
+    its citations may point at ids that have changed since, so only `cites` searches it."""
+    files = [p for p in DOCS.rglob("*.md")
+             if "_templates" not in p.parts and p.parent != SOURCES
+             and (history or "history" not in p.relative_to(DOCS).parts[:1])
+             and p not in (DOCS / "README.md", DOCS / "specs" / "README.md")]
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        if (HUB / name).exists():
+            files.append(HUB / name)
+    return sorted(files)
+
+
+# ---- commands --------------------------------------------------------------------------------
+
+def cmd_list(stale_only):
+    reg = load()
+    limit = config().get("stale_days", 30)
+    rows = [("id", "kind", "title", "fetched", "age", "ref")]
+    for s in reg["sources"]:
+        a = age_days(s)
+        stale = a is not None and a > limit and s["kind"] not in NEVER_STALE
+        if stale_only and not stale and s.get("fetched_at"):
+            continue
+        rows.append((s["id"], s["kind"], s["title"][:40], (s.get("fetched_at") or "never")[:10],
+                     "-" if a is None else f"{a}d" + (" stale" if stale else ""), s["ref"][:60]))
+    if len(rows) == 1:
+        print("no sources" + (" are stale" if stale_only else " yet: docs add-source ..."))
+        return
+    w = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    for r in rows:
+        print("  ".join(c.ljust(x) for c, x in zip(r, w)).rstrip())
+
+
+def cmd_add(kind, ref, title, notes):
+    if kind not in KINDS:
+        die(f"kind must be one of {', '.join(sorted(KINDS))}")
+    reg = load()
+    for s in reg["sources"]:
+        if s["ref"] == ref and s.get("status") != "removed":
+            print(s["id"])
+            return
+    n = max([int(s["id"][2:]) for s in reg["sources"]] or [0]) + 1
+    sid = f"S-{n:03d}"
+    reg["sources"].append({"id": sid, "kind": kind, "title": title, "ref": ref, "added": date.today().isoformat(),
+                           "fetched_at": None, "changed_at": None, "sha256": None,
+                           "snapshot": f"docs/sources/{sid}.md", "status": "active", "notes": notes or ""})
+    save(reg)
+    print(sid)
+
+
+def cmd_record(sid, file):
+    reg = load()
+    s = find(reg, sid)
+    text = normalize(Path(file).read_text())
+    h = sha(text)
+    snap = HUB / s["snapshot"]
+    s["fetched_at"] = now()
+    if s.get("sha256") == h and snap.exists():
+        save(reg)
+        print("unchanged")
+        return
+    state = "new" if not snap.exists() else "changed"
+    if snap.exists():
+        shutil.copy2(snap, snap.with_name(f"{sid}.prev.md"))
+    snap.parent.mkdir(parents=True, exist_ok=True)
+    snap.write_text(text)
+    s["sha256"], s["changed_at"] = h, s["fetched_at"]
+    save(reg)
+    print(state)
+
+
+def cmd_diff(sid):
+    s = find(load(), sid)
+    cur, prev = HUB / s["snapshot"], SOURCES / f"{sid}.prev.md"
+    if not prev.exists():
+        print(f"{sid}: no previous snapshot")
+        return
+    sys.stdout.writelines(difflib.unified_diff(prev.read_text().splitlines(True), cur.read_text().splitlines(True),
+                                               f"{sid} (previous)", f"{sid} (current)"))
+
+
+def cmd_cites(ident):
+    ident = ident.strip("[]")
+    for f in doc_files(history=True):
+        for i, line in enumerate(f.read_text().splitlines(), 1):
+            if f"[{ident}]" in line:
+                print(f"{f.relative_to(HUB)}:{i}: {line.strip()[:140]}")
+
+
+def cmd_adr_new(title):
+    adr = DOCS / "adr"
+    adr.mkdir(parents=True, exist_ok=True)
+    nums = [int(m.group(1)) for p in adr.glob("*.md") if (m := re.match(r"(\d{4})-", p.name))]
+    n = max(nums or [0]) + 1
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "decision"
+    path = adr / f"{n:04d}-{slug}.md"
+    text = (DOCS / "_templates/adr.md").read_text()
+    text = text.replace("ADR-NNNN: <decision title>", f"ADR-{n:04d}: {title}").replace("<YYYY-MM-DD>", date.today().isoformat())
+    path.write_text(text)
+    print(path.relative_to(HUB))
+
+
+def spec_files():
+    """[(number, area, path)] in reading order; files that don't match NNN_<area>.md come back with None."""
+    d = DOCS / "specs"
+    out = []
+    for p in sorted(d.glob("*.md")) if d.exists() else []:
+        if p.name == "README.md":
+            continue
+        m = SPEC_FILE.match(p.name)
+        out.append((int(m.group(1)), m.group(2), p) if m else (None, None, p))
+    return out
+
+
+def spec_meta(path):
+    text = path.read_text()
+    title = next((l[2:].strip() for l in text.splitlines() if l.startswith("# ")), path.stem)
+    status = re.search(r"Status:\s*([^·\n]+)", text)
+    implements = re.search(r"Implements:\s*([^·\n]+)", text)
+    summary = re.search(r"^## Summary\s*\n+(.+?)(?:\n\n|\n##|\Z)", text, re.M | re.S)
+    first = re.split(r"(?<=[.!?])\s", " ".join(summary.group(1).split()), maxsplit=1)[0] if summary else ""
+    return {"title": title, "status": status.group(1).strip() if status else "",
+            "implements": ", ".join(CITE.findall(implements.group(1))) if implements else "", "summary": first}
+
+
+def index_text():
+    rows = ["# Specs: reading order", "",
+            "Generated by `factory/bin/docs index` from the spec files; don't edit it by hand.",
+            "Read the specs in this order: each one builds on the ones before it.", "",
+            "| # | Spec | Status | Implements | Summary |", "|---|---|---|---|---|"]
+    for n, area, p in spec_files():
+        if n is None:
+            continue
+        m = spec_meta(p)
+        cell = {k: v.replace("|", "/") for k, v in m.items()}
+        rows.append(f"| {n:03d} | [{area}]({p.name}) | {cell['status']} | {cell['implements']} | {cell['summary']} |")
+    return "\n".join(rows) + "\n"
+
+
+def cmd_specs():
+    specs = spec_files()
+    if not specs:
+        print('no specs yet: docs spec-new "<area>"')
+        return
+    for n, area, p in specs:
+        m = spec_meta(p)
+        num = f"{n:03d}" if n is not None else "???"
+        print(f"{num}  {(area or p.stem):20} {m['status'][:22]:22} {m['title']}")
+
+
+def cmd_spec_new(area, at=None):
+    slug = re.sub(r"[^a-z0-9]+", "-", area.lower()).strip("-")[:50] or "area"
+    specs = [s for s in spec_files() if s[0] is not None]
+    if any(a == slug for _, a, _ in specs):
+        die(f"a spec for {slug!r} exists already")
+    n = int(at) if at else max([s[0] for s in specs] or [0]) + 1
+    if any(s[0] == n for s in specs):
+        die(f"number {n:03d} is taken; pick another --at, or renumber with git mv")
+    path = DOCS / "specs" / f"{n:03d}_{slug}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = (DOCS / "_templates/spec.md").read_text()
+    text = text.replace("# Spec NNN: <area>", f"# Spec {n:03d}: {area}").replace("<area>", slug)
+    path.write_text(text)
+    print(path.relative_to(HUB))
+
+
+def cmd_index():
+    path = DOCS / "specs" / "README.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(index_text())
+    print(path.relative_to(HUB))
+
+
+def cmd_check():
+    errors, warnings = [], []
+    reg = load()
+    ids = {s["id"] for s in reg["sources"] if s.get("status") != "removed"}
+    for s in reg["sources"]:
+        if s.get("status") == "removed":
+            continue
+        snap = HUB / s["snapshot"]
+        if not snap.exists():
+            errors.append(f"{s['id']}: no snapshot ({s['snapshot']}); fetch it and run docs record")
+        elif s.get("sha256") and sha(normalize(snap.read_text())) != s["sha256"]:
+            errors.append(f"{s['id']}: {s['snapshot']} was edited by hand; snapshots are written only by docs record")
+        a, limit = age_days(s), config().get("stale_days", 30)
+        if a is not None and a > limit and s["kind"] not in NEVER_STALE:
+            warnings.append(f"{s['id']}: last fetched {a} days ago ({s['kind']}): /docs-sync {s['id']}")
+    adrs = {}
+    for p in sorted((DOCS / "adr").glob("*.md")):
+        m = re.match(r"(\d{4})-", p.name)
+        if not m:
+            errors.append(f"{p.relative_to(HUB)}: ADR files are named NNNN-<slug>.md")
+            continue
+        adrs[f"ADR-{m.group(1)}"] = p
+        if not re.search(r"^\s*-?\s*Status:\s*\S", p.read_text(), re.M):
+            errors.append(f"{p.relative_to(HUB)}: no Status line")
+    nums = sorted(int(k[4:]) for k in adrs)
+    if nums and nums != list(range(1, len(nums) + 1)):
+        errors.append(f"ADR numbers aren't 1..{len(nums)} without gaps: {nums}")
+    numbers = {}
+    for n, area, p in spec_files():
+        rel = p.relative_to(HUB)
+        if n is None:
+            errors.append(f"{rel}: specs are named NNN_<area>.md in reading order (docs spec-new)")
+            continue
+        if n in numbers:
+            errors.append(f"{rel} and {numbers[n]} share the number {n:03d}")
+        numbers[n] = rel
+        for m in DEFINE.finditer(p.read_text()):
+            if m.group(1).startswith("SPEC-") and not m.group(1).startswith(f"SPEC-{area}-"):
+                errors.append(f"{rel}: defines {m.group(1)}; ids in this file are SPEC-{area}-xx")
+    if numbers and sorted(numbers) != list(range(1, len(numbers) + 1)):
+        warnings.append(f"spec numbers have gaps: {', '.join(f'{n:03d}' for n in sorted(numbers))}")
+    idx = DOCS / "specs" / "README.md"
+    if numbers and (not idx.exists() or idx.read_text() != index_text()):
+        warnings.append("docs/specs/README.md is out of date: docs index")
+    defined, cited = {}, {}
+    for f in doc_files():
+        text = f.read_text()
+        rel = str(f.relative_to(HUB))
+        for m in DEFINE.finditer(text):
+            if m.group(1) in defined:
+                errors.append(f"{m.group(1)} is defined twice: {defined[m.group(1)]} and {rel}")
+            defined[m.group(1)] = rel
+        for m in CITE.finditer(text):
+            cited.setdefault(m.group(1), set()).add(rel)
+    known = ids | set(adrs) | set(defined)
+    for ident, where in sorted(cited.items()):
+        if ident not in known:
+            errors.append(f"[{ident}] is cited in {', '.join(sorted(where))} but defined nowhere")
+    for sid in sorted(ids - set(cited)):
+        warnings.append(f"{sid}: no document cites it")
+    brd = DOCS / "brd.md"
+    if brd.exists():
+        for line in brd.read_text().splitlines():
+            m = DEFINE.match(line)
+            if m and m.group(1).startswith(("BR-", "NFR-")) and not CITE.search(line) and "Source:" not in line:
+                warnings.append(f"{m.group(1)} in docs/brd.md cites no source")
+    for w in warnings:
+        print(f"warn  {w}")
+    for e in errors:
+        print(f"ERROR {e}")
+    print(f"docs: {len(ids)} sources, {len(adrs)} ADRs, {len(defined)} defined items, "
+          f"{len(errors)} errors, {len(warnings)} warnings")
+    sys.exit(1 if errors else 0)
+
+
+def main(argv):
+    if not argv or argv[0] in {"-h", "--help"}:
+        print(__doc__.strip())
+        return
+    cmd, args = argv[0], argv[1:]
+    if cmd == "list":
+        cmd_list("--stale" in args)
+    elif cmd == "add-source":
+        opts = dict(zip(args[::2], args[1::2]))
+        if not {"--kind", "--ref", "--title"} <= set(opts):
+            die("add-source needs --kind, --ref and --title")
+        cmd_add(opts["--kind"], opts["--ref"], opts["--title"], opts.get("--notes"))
+    elif cmd == "record" and len(args) == 2:
+        cmd_record(*args)
+    elif cmd == "diff" and len(args) == 1:
+        cmd_diff(args[0])
+    elif cmd == "cites" and len(args) == 1:
+        cmd_cites(args[0])
+    elif cmd == "adr-new" and len(args) == 1:
+        cmd_adr_new(args[0])
+    elif cmd == "spec-new" and args:
+        cmd_spec_new(args[0], args[args.index("--at") + 1] if "--at" in args else None)
+    elif cmd == "specs" and not args:
+        cmd_specs()
+    elif cmd == "index" and not args:
+        cmd_index()
+    elif cmd == "check" and not args:
+        cmd_check()
+    else:
+        die(f"bad arguments: {' '.join(argv)}\n\n{__doc__.strip()}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

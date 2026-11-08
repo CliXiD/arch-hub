@@ -1,0 +1,524 @@
+#!/usr/bin/env python3
+"""Add a git repo to the hub: clone it, detect its stack, and wire it into the factory.
+
+Usage:
+  factory/bin/add-repo <git-url> [--key KEY] [--base BRANCH] [--role TEXT] [--dir NAME]
+  factory/bin/add-repo --existing repos/<dir> [--key KEY] [--base BRANCH] [--role TEXT]
+  factory/bin/add-repo --redetect <key>          re-run detection, rewrite the onboarding report
+  factory/bin/add-repo --create <owner/name> [--private|--public] [--template <owner/repo>]
+                       [--description TEXT] --yes [--key ...]
+                                                 create the repo on GitHub (gh), clone it, and push a
+                                                 first README commit to the base branch if it's empty
+  options: --force-checks   overwrite an existing factory/checks/<key>.sh with a fresh draft
+
+The base branch is --base, else `main` when the remote has it, else the remote's default
+branch. auto_merge starts false (the factory stops at "approved, waiting for a human merge");
+set it true in factory/repos.json only where the factory may merge without a human review.
+
+What it writes (all re-runnable; it never touches the repo's own files, except the first
+README commit of a repo it just created):
+  repos/<dir>/                       the clone
+  factory/repos.json                 the repo's entry (path, remote, base, checks, protected paths, ...)
+  factory/checks/<key>.sh            a first draft of the repo's checks, from its stack
+  factory/onboarding/<key>.md        what detection found: stack, scripts, CI commands, services, env
+  <hub>.code-workspace               a VS Code folder for the repo
+  AGENTS.md, .github/ISSUE_TEMPLATE  the repo in the hub's repo table and the issue template
+
+Then run /hub-onboard in Claude Code to turn the drafts into checks that pass, and
+/hub-dev-stack for the local services the repo needs.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+HUB = Path(__file__).resolve().parents[2]
+FACTORY = HUB / "factory"
+REPOS_JSON = FACTORY / "repos.json"
+
+
+def die(msg):
+    print(f"add-repo: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def git(*args, cwd=HUB, check=True):
+    res = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if check and res.returncode != 0:
+        die(f"`git {' '.join(args)}` failed: {(res.stderr or res.stdout).strip()}")
+    return res.stdout.strip()
+
+
+def slug_from_url(url):
+    """owner/repo for GitHub remotes, else None."""
+    m = re.search(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def sanitize(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "repo"
+
+
+def read(path):
+    try:
+        return path.read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+def rel_glob(root, pattern, limit=50):
+    out = []
+    for p in root.glob(pattern):
+        if any(part in {"node_modules", ".git", "dist", "build", ".venv", "vendor", "target"} for part in p.parts):
+            continue
+        out.append(str(p.relative_to(root)))
+        if len(out) >= limit:
+            break
+    return sorted(out)
+
+
+# ---- Detection -------------------------------------------------------------------------------
+
+FRONTEND = {"react", "next", "vue", "nuxt", "svelte", "@sveltejs/kit", "@angular/core", "solid-js", "@remix-run/react", "astro"}
+BACKEND = {"@nestjs/core", "express", "fastify", "koa", "hono", "@hapi/hapi"}
+SERVICE_DEPS = {
+    "postgres": {"pg", "postgres", "psycopg", "psycopg2", "psycopg2-binary", "asyncpg"},
+    "mysql": {"mysql", "mysql2", "pymysql", "mysqlclient"},
+    "mongodb": {"mongoose", "mongodb", "pymongo", "motor"},
+    "redis": {"redis", "ioredis", "@nestjs/bull", "bullmq", "bull"},
+    "kafka": {"kafkajs", "kafka-python", "confluent-kafka", "@nestjs/microservices"},
+    "rabbitmq": {"amqplib", "amqp-connection-manager", "pika", "aio-pika"},
+    "aws (localstack)": {"@aws-sdk/client-sqs", "@aws-sdk/client-s3", "aws-sdk", "boto3", "@ssut/nestjs-sqs"},
+    "smtp": {"nodemailer", "@nestjs-modules/mailer"},
+    "elasticsearch": {"@elastic/elasticsearch", "elasticsearch"},
+}
+ENV_HINTS = re.compile(r"^(?:export\s+)?((?=[A-Z])[A-Z0-9_]*(?:DATABASE|DB_|POSTGRES|MYSQL|MONGO|REDIS|KAFKA|RABBIT|AMQP|SQS|S3_|AWS_|SMTP|MAIL_|ELASTIC|_URL|_ENDPOINT|_HOST)[A-Z0-9_]*)\s*=", re.M)
+
+
+def detect(root):
+    d = {"stacks": [], "checks": [], "notes": [], "surfaces": set(), "implies": set(), "protected": [".github/*"],
+         "services": set(), "env_example": None, "env_target": None, "scripts": {}, "ci": [], "compose": [],
+         "extra_tests": [], "auto_merge": False, "node_version": None, "frontend": False}
+
+    # --- Node
+    pkg_path = root / "package.json"
+    if pkg_path.exists():
+        try:
+            pkg = json.loads(read(pkg_path))
+        except ValueError:
+            pkg = {}
+        d["stacks"].append("node")
+        scripts = pkg.get("scripts", {}) or {}
+        d["scripts"] = scripts
+        deps = set((pkg.get("dependencies") or {})) | set((pkg.get("devDependencies") or {}))
+        for f in (".nvmrc", ".node-version"):
+            if (root / f).exists():
+                d["node_version"] = read(root / f).strip()
+        if deps & FRONTEND:
+            d["surfaces"].add("ui"); d["frontend"] = True
+        if deps & BACKEND:
+            d["notes"].append("backend framework: " + ", ".join(sorted(deps & BACKEND)))
+        for svc, names in SERVICE_DEPS.items():
+            if deps & names:
+                d["services"].add(svc)
+        if "typeorm" in deps or "@prisma/client" in deps or "knex" in deps or "sequelize" in deps or "drizzle-orm" in deps:
+            d["services"].add("database (ORM: " + ", ".join(sorted(deps & {"typeorm", "@prisma/client", "knex", "sequelize", "drizzle-orm"})) + ")")
+        cmds = ['source "$FACTORY_HUB/factory/checks/lib/common.sh"',
+                'source "$FACTORY_HUB/factory/checks/lib/node.sh"',
+                "node_setup", "hub_env"]
+        def pick(*names):
+            return next((n for n in names if n in scripts), None)
+        lint = pick("lint", "lint:check", "eslint")
+        typecheck = pick("typecheck", "type-check", "check-types", "tsc", "check")
+        test = pick("test:unit", "test:run", "test:ci", "unit", "test")
+        build = pick("build")
+        for name in (lint, typecheck):
+            if name:
+                cmds.append(f"step pm run {name}")
+        if test:
+            body = scripts[test]
+            if "--watch" in body:
+                cmds.append(f"# FACTORY-TODO: `{test}` runs in watch mode ({body}); replace with a one-shot run")
+                d["notes"].append(f"script {test} uses --watch")
+            cmds.append(f"step pm run {test}")
+        else:
+            d["notes"].append("no test script")
+        if build:
+            cmds.append(f"step pm run {build}")
+        if not (lint or test or build):
+            cmds.append("# FACTORY-TODO: no lint/test/build scripts found; add the real commands")
+            cmds.append("exit 1")
+        d["checks"] = cmds
+        d["extra_tests"] = [f"{k}: {v}" for k, v in scripts.items()
+                            if re.search(r"e2e|integration|playwright|cypress", k + " " + v) and k != test]
+        if "next" in deps:
+            d["env_target"] = ".env.local"
+        # migrations
+        for pat in ("src/**/migrations", "src/migrations", "migrations", "prisma/migrations", "db/migrations", "drizzle"):
+            for m in rel_glob(root, pat, 5):
+                if (root / m).is_dir():
+                    d["protected"].append(f"{m}/*")
+                    d["implies"].add("db")
+
+    # --- Python
+    if (root / "pyproject.toml").exists() or (root / "requirements.txt").exists() or (root / "setup.py").exists():
+        d["stacks"].append("python")
+        text = read(root / "pyproject.toml") + read(root / "requirements.txt") + read(root / "requirements-dev.txt") + read(root / "setup.cfg")
+        cmds = ['source "$FACTORY_HUB/factory/checks/lib/common.sh"',
+                'source "$FACTORY_HUB/factory/checks/lib/python.sh"', "python_setup", "hub_env"]
+        low = text.lower()
+        if "ruff" in low:
+            cmds.append("step ruff check .")
+        elif "flake8" in low:
+            cmds.append("step flake8")
+        if "mypy" in low:
+            cmds.append("step mypy .")
+        if (root / "manage.py").exists():
+            cmds.append("step python manage.py check")
+            d["notes"].append("Django project")
+        if "pytest" in low or (root / "tests").exists():
+            cmds.append('step pytest -q -m "not integration and not e2e"  # FACTORY-TODO: confirm markers')
+        else:
+            cmds.append("# FACTORY-TODO: no pytest found; add the test command")
+        for svc, names in SERVICE_DEPS.items():
+            if any(re.search(rf"\b{re.escape(n)}\b", low) for n in names):
+                d["services"].add(svc)
+        for m in rel_glob(root, "**/alembic/versions", 3) + rel_glob(root, "**/migrations", 10):
+            if (root / m).is_dir():
+                d["protected"].append(f"{m}/*")
+                d["implies"].add("db")
+        d["checks"] = d["checks"] or cmds
+
+    # --- Go
+    if (root / "go.mod").exists():
+        d["stacks"].append("go")
+        d["checks"] = d["checks"] or ['source "$FACTORY_HUB/factory/checks/lib/common.sh"', "hub_env",
+                                      "step go vet ./...",
+                                      "if [ -f .golangci.yml ] || [ -f .golangci.yaml ]; then command -v golangci-lint >/dev/null && step golangci-lint run; fi",
+                                      "step go test -short ./...", "step go build ./..."]
+
+    # --- JVM
+    if (root / "pom.xml").exists():
+        d["stacks"].append("maven")
+        mvn = "./mvnw" if (root / "mvnw").exists() else "mvn"
+        d["checks"] = d["checks"] or ['source "$FACTORY_HUB/factory/checks/lib/common.sh"', "hub_env",
+                                      f"step {mvn} -B -q -DskipITs verify"]
+    elif any((root / f).exists() for f in ("build.gradle", "build.gradle.kts")):
+        d["stacks"].append("gradle")
+        gr = "./gradlew" if (root / "gradlew").exists() else "gradle"
+        d["checks"] = d["checks"] or ['source "$FACTORY_HUB/factory/checks/lib/common.sh"', "hub_env",
+                                      f"step {gr} --no-daemon check assemble"]
+    for m in rel_glob(root, "src/main/resources/db/migration", 1) + rel_glob(root, "src/main/resources/db/changelog", 1):
+        d["protected"].append(f"{m}/*"); d["implies"].add("db")
+
+    # --- .NET / Rust
+    if rel_glob(root, "*.sln", 1) or rel_glob(root, "*.csproj", 1):
+        d["stacks"].append("dotnet")
+        d["checks"] = d["checks"] or ['source "$FACTORY_HUB/factory/checks/lib/common.sh"', "hub_env",
+                                      "step dotnet build --nologo", "step dotnet test --nologo --no-build"]
+    if (root / "Cargo.toml").exists():
+        d["stacks"].append("rust")
+        d["checks"] = d["checks"] or ['source "$FACTORY_HUB/factory/checks/lib/common.sh"', "hub_env",
+                                      "step cargo clippy --all-targets -- -D warnings", "step cargo test", "step cargo build"]
+
+    # --- Infra / deploy repos
+    infra = rel_glob(root, "**/kustomization.y*ml", 3) + rel_glob(root, "**/Chart.yaml", 3) + rel_glob(root, "**/*.tf", 3)
+    if infra and not d["stacks"]:
+        d["stacks"].append("infra")
+        d["implies"].add("infra"); d["auto_merge"] = False
+        cmds = ['source "$FACTORY_HUB/factory/checks/lib/common.sh"']
+        if rel_glob(root, "**/kustomization.y*ml", 1):
+            cmds.append("# kustomize build every overlay that changed (needs kubectl or kustomize)")
+            cmds.append('for k in $(git diff --name-only "origin/$FACTORY_BASE...HEAD" | grep -E "kustomization.ya?ml$" || true); do step kubectl kustomize "$(dirname "$k")" >/dev/null; done')
+        if rel_glob(root, "**/*.tf", 1):
+            cmds.append("step terraform fmt -check -recursive")
+        cmds.append("# FACTORY-TODO: add the repo's own policy/lint checks (see its CI and AGENTS.md)")
+        d["checks"] = cmds
+        d["notes"].append("deploy/infra repo: keep auto_merge off")
+    # --- SQL-only repos (dbup, flyway, liquibase without an app)
+    sql = rel_glob(root, "**/*.sql", 5)
+    if sql and not d["stacks"]:
+        d["stacks"].append("sql")
+        d["implies"].add("db"); d["auto_merge"] = False
+        d["protected"].append("*.sql")
+        d["checks"] = ['source "$FACTORY_HUB/factory/checks/lib/common.sh"',
+                       '# New SQL files only (existing ones are protected_paths). Make sure each added file is non-empty.',
+                       'for f in $(git diff --name-only --diff-filter=A "origin/$FACTORY_BASE...HEAD" -- "*.sql"); do [ -s "$f" ] || { echo "empty: $f"; exit 1; }; echo "ok $f"; done',
+                       "# FACTORY-TODO: add naming/layout rules for this repo's migration tool"]
+        d["notes"].append("SQL-only repo: keep auto_merge off")
+
+    if not d["checks"]:
+        d["checks"] = ['source "$FACTORY_HUB/factory/checks/lib/common.sh"',
+                       "# FACTORY-TODO: stack not detected; add this repo's lint, test and build commands", "exit 1"]
+
+    # --- Context for /hub-onboard and /hub-dev-stack
+    for pat in (".github/workflows/*.y*ml", ".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml", "bitbucket-pipelines.yml"):
+        for f in rel_glob(root, pat, 10):
+            runs = re.findall(r"^\s*(?:-\s*)?run:\s*[|>]?\s*(.*)$", read(root / f), re.M)
+            d["ci"].append((f, [r.strip() for r in runs if r.strip()][:15]))
+    for f in rel_glob(root, "*compose*.y*ml", 10) + rel_glob(root, "docker/**/*compose*.y*ml", 5):
+        images = re.findall(r"^\s*image:\s*['\"]?([^\s'\"]+)", read(root / f), re.M)
+        d["compose"].append((f, images))
+    for f in (".env.example", ".env.sample", ".env.template", ".env.dist", "env.example", "example.env"):
+        if (root / f).exists():
+            d["env_example"] = f; break
+    if not d["env_example"]:
+        found = rel_glob(root, "env-example*", 1) + rel_glob(root, ".env.*.example", 1)
+        d["env_example"] = found[0] if found else None
+    if d["env_example"]:
+        d["env_target"] = d["env_target"] or ".env"
+        hints = sorted(set(ENV_HINTS.findall(read(root / d["env_example"]))))
+        if hints:
+            d["notes"].append("env keys that look like services: " + ", ".join(hints[:40]))
+    if rel_glob(root, "**/wiremock/**/mappings", 1) or rel_glob(root, "**/__files", 1):
+        d["services"].add("wiremock mocks (found mappings)")
+    return d
+
+
+# ---- Writers ---------------------------------------------------------------------------------
+
+def checks_script(key, d):
+    lines = ["#!/usr/bin/env bash",
+             f"# {key}: generated by factory/bin/add-repo from a {'+'.join(d['stacks']) or 'unknown'} stack.",
+             "# A first draft: /hub-onboard compares it with the repo's CI and runs it until it passes on the",
+             "# base branch. Unit tests only: anything needing services (e2e, integration) stays out of the gate.",
+             "# Lines marked with the to-do marker below still need a decision; factory/bin/setup flags them."]
+    return "\n".join(lines + d["checks"]) + "\n"
+
+
+def report(key, entry, d):
+    out = [f"# Onboarding: {key}", "",
+           f"Generated by `factory/bin/add-repo`. Read by `/hub-onboard` and `/hub-dev-stack`; re-run with",
+           f"`factory/bin/add-repo --redetect {key}`.", "",
+           f"- Path: `{entry['path']}`  remote: `{entry['remote']}`  base: `{entry['base']}`",
+           f"- Stack: {', '.join(d['stacks']) or 'not detected'}"
+           + (f"; Node {d['node_version']}" if d["node_version"] else ""),
+           f"- Surfaces hint: {', '.join(sorted(d['surfaces'])) or 'none'}; implies reviewers: {', '.join(sorted(d['implies'])) or 'none'}",
+           f"- Protected paths: {', '.join(entry['protected_paths'])}",
+           f"- auto_merge: {entry['auto_merge']}",
+           f"- Env example: {d['env_example'] or 'none'} → target {d['env_target'] or 'none'}", ""]
+    if d["notes"]:
+        out += ["## Notes", ""] + [f"- {n}" for n in d["notes"]] + [""]
+    if d["scripts"]:
+        out += ["## package.json scripts", ""] + [f"- `{k}`: `{v}`" for k, v in d["scripts"].items()] + [""]
+    if d["extra_tests"]:
+        out += ["## Tests that probably need services (not in the gate)", ""] + [f"- {t}" for t in d["extra_tests"]] + [""]
+    out += ["## CI", ""]
+    if d["ci"]:
+        for f, runs in d["ci"]:
+            out += [f"`{f}`:"] + [f"- `{r}`" for r in runs] + [""]
+    else:
+        out += ["No CI config found.", ""]
+    out += ["## Services the code seems to use", ""]
+    out += [f"- {s}" for s in sorted(d["services"])] or ["- none detected"]
+    out += [""]
+    if d["compose"]:
+        out += ["## Compose files in the repo", ""] + [f"- `{f}`: {', '.join(i) or 'no images'}" for f, i in d["compose"]] + [""]
+    out += ["## Draft checks", "", "```bash", checks_script(key, d).rstrip(), "```", ""]
+    return "\n".join(out)
+
+
+def replace_block(text, name, body):
+    start, end = f"<!-- hub:{name} -->", f"<!-- /hub:{name} -->"
+    if start not in text or end not in text:
+        return text
+    a, b = text.index(start) + len(start), text.index(end)
+    return text[:a] + "\n" + body.rstrip() + "\n" + text[b:]
+
+
+def refresh_docs(repos):
+    rows = ["| key | path | stack | role | base | auto-merge |", "|---|---|---|---|---|---|"]
+    checks = ["- [ ] " + k + " — what changes" for k in repos]
+    for k, r in repos.items():
+        rows.append(f"| {k} | `{r['path']}` | {r.get('stack', '')} | {r.get('role', '')} | `{r['base']}` | {'yes' if r.get('auto_merge', True) else 'no'} |")
+    for name in ("AGENTS.md", "CLAUDE.md"):   # AGENTS.md holds the instructions; an old hub may have only CLAUDE.md
+        doc = HUB / name
+        if doc.exists() and "<!-- hub:repos -->" in doc.read_text():
+            doc.write_text(replace_block(doc.read_text(), "repos", "\n".join(rows)))
+    tmpl = HUB / ".github/ISSUE_TEMPLATE/factory-requirement.md"
+    if tmpl.exists():
+        tmpl.write_text(replace_block(tmpl.read_text(), "repos", "\n".join(checks)))
+    for ws in HUB.glob("*.code-workspace"):
+        try:
+            data = json.loads(ws.read_text())
+        except ValueError:
+            print(f"add-repo: {ws.name} isn't plain JSON (comments?); add {', '.join(r['path'] for r in repos.values())} to it by hand")
+            continue
+        folders = [f for f in data.get("folders", []) if not f.get("path", "").startswith("repos/")]
+        folders += [{"path": r["path"], "name": f"{k} ({r.get('stack', '?')})"} for k, r in repos.items()]
+        data["folders"] = folders
+        ws.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def create_repo(a):
+    """gh repo create, then clone; push a first commit to the base branch if the repo is empty."""
+    slug = a.create
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", slug):
+        die("--create takes owner/name")
+    if not a.yes:
+        if sys.stdin.isatty():
+            if input(f"Create GitHub repo {slug} ({'public' if a.public else 'private'})? [y/N] ").strip().lower() not in {"y", "yes"}:
+                die("not created")
+        else:
+            die("--create needs --yes (it creates a repository on GitHub)")
+    exists = subprocess.run(["gh", "repo", "view", slug], capture_output=True, text=True).returncode == 0
+    if exists:
+        print(f"add-repo: {slug} already exists on GitHub; cloning it")
+    else:
+        cmd = ["gh", "repo", "create", slug, "--public" if a.public else "--private"]
+        if a.template:
+            cmd += ["--template", a.template]
+        if a.description or a.role:
+            cmd += ["--description", a.description or a.role]
+        print("== " + " ".join(cmd))
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            die(f"gh repo create failed: {(res.stderr or res.stdout).strip()}")
+    name = a.dir or slug.split("/")[1]
+    path = HUB / "repos" / name
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"== gh repo clone {slug} {path.relative_to(HUB)}")
+        res = subprocess.run(["gh", "repo", "clone", slug, str(path)], capture_output=True, text=True)
+        if res.returncode != 0 and not (path / ".git").exists():
+            die(f"gh repo clone failed: {(res.stderr or res.stdout).strip()}")
+    if not git("rev-parse", "--verify", "--quiet", "HEAD", cwd=path, check=False):
+        base = a.base or "main"
+        (path / "README.md").write_text(f"# {name}\n\n{a.role or a.description or ''}\n\nCreated from the hub. "
+                                        "See the hub's docs/ for the BRD, specs and ADRs this repo follows.\n")
+        git("checkout", "-q", "-b", base, cwd=path)
+        git("add", "README.md", cwd=path)
+        git("commit", "-q", "-m", "chore: initial commit", cwd=path)
+        git("push", "-q", "-u", "origin", base, cwd=path)
+        print(f"add-repo: pushed a first commit to {slug}@{base}")
+    origin = git("remote", "get-url", "origin", cwd=path, check=False)
+    return path, origin if slug_from_url(origin or "") == slug else f"https://github.com/{slug}.git"
+
+
+def default_base(path):
+    """main if the remote has it, else the remote's default branch, else the current branch."""
+    if git("ls-remote", "--heads", "origin", "main", cwd=path, check=False):
+        return "main"
+    git("remote", "set-head", "origin", "--auto", cwd=path, check=False)
+    head = git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", cwd=path, check=False)
+    return head.rsplit("/", 1)[-1] if head else (git("branch", "--show-current", cwd=path, check=False) or "main")
+
+
+def load_repos():
+    if REPOS_JSON.exists():
+        return json.loads(REPOS_JSON.read_text())
+    return {"repos": {}, "merge_order": [], "rules": []}
+
+
+def save_repos(data):
+    data["merge_order"] = [k for k in data.get("merge_order", []) if k in data["repos"]]
+    data["merge_order"] += [k for k in data["repos"] if k not in data["merge_order"]]
+    REPOS_JSON.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("url", nargs="?")
+    ap.add_argument("--existing")
+    ap.add_argument("--redetect")
+    ap.add_argument("--key")
+    ap.add_argument("--base")
+    ap.add_argument("--role")
+    ap.add_argument("--dir")
+    ap.add_argument("--force-checks", action="store_true")
+    ap.add_argument("--create")
+    ap.add_argument("--private", action="store_true")
+    ap.add_argument("--public", action="store_true")
+    ap.add_argument("--template")
+    ap.add_argument("--description")
+    ap.add_argument("--yes", action="store_true")
+    a = ap.parse_args()
+    data = load_repos()
+
+    if a.redetect:
+        if a.redetect not in data["repos"]:
+            die(f"no repo {a.redetect} in factory/repos.json")
+        key = a.redetect
+        entry = data["repos"][key]
+        path = HUB / entry["path"]
+    else:
+        if a.create:
+            path, url = create_repo(a)
+        elif a.existing:
+            path = (HUB / a.existing).resolve() if not Path(a.existing).is_absolute() else Path(a.existing)
+            if not (path / ".git").exists():
+                die(f"{a.existing} isn't a git checkout")
+            url = git("remote", "get-url", "origin", cwd=path, check=False) or str(path)
+        elif a.url:
+            url = a.url
+            name = a.dir or re.sub(r"\.git$", "", url.rstrip("/").split("/")[-1].split(":")[-1])
+            path = HUB / "repos" / name
+            if path.exists():
+                if not (path / ".git").exists():
+                    die(f"{path.relative_to(HUB)} exists and isn't a git checkout")
+                print(f"add-repo: {path.relative_to(HUB)} already cloned; updating its entry")
+            else:
+                print(f"== git clone {url} {path.relative_to(HUB)}")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                git("clone", url, str(path))
+        else:
+            die("give a git URL, --existing <dir>, --create <owner/name> or --redetect <key>")
+        try:
+            rel = str(path.relative_to(HUB))
+        except ValueError:
+            die(f"{path} must live inside the hub (use repos/<dir>)")
+        key = sanitize(a.key or path.name)
+        existing_key = next((k for k, r in data["repos"].items() if r["path"] == rel), None)
+        if existing_key and existing_key != key and not a.key:
+            key = existing_key
+        base = a.base or default_base(path)
+        old = data["repos"].get(key, {})
+        entry = {
+            "path": rel,
+            "remote": slug_from_url(url) or url,
+            "url": url,
+            "base": base,
+            "role": a.role or old.get("role", ""),
+            "checks": f"factory/checks/{key}.sh",
+        }
+        entry = {**old, **{k: v for k, v in entry.items() if v or k not in old}}
+        if not slug_from_url(url):
+            print(f"add-repo: warning: {url} isn't a GitHub remote; the factory opens PRs with gh, so it needs one")
+
+    d = detect(path)
+    entry.setdefault("implies", sorted(d["implies"]))
+    entry.setdefault("protected_paths", sorted(set(d["protected"])))
+    entry.setdefault("auto_merge", d["auto_merge"])
+    entry["stack"] = "+".join(d["stacks"]) or "unknown"
+    if d["env_target"]:
+        entry.setdefault("env", {"example": d["env_example"], "target": d["env_target"]})
+    entry.setdefault("checks", f"factory/checks/{key}.sh")
+    data["repos"][key] = entry
+    save_repos(data)
+
+    checks = HUB / entry["checks"]
+    checks.parent.mkdir(parents=True, exist_ok=True)
+    if not checks.exists() or a.force_checks:
+        checks.write_text(checks_script(key, d))
+        checks.chmod(0o755)
+        wrote = "wrote"
+    else:
+        wrote = "kept"
+    onboarding = FACTORY / "onboarding" / f"{key}.md"
+    onboarding.parent.mkdir(parents=True, exist_ok=True)
+    onboarding.write_text(report(key, entry, d))
+    refresh_docs(data["repos"])
+
+    print(f"{key}: {entry['path']} → {entry['remote']} (base {entry['base']}, stack {entry['stack']})")
+    print(f"  checks {wrote}: {entry['checks']}  report: factory/onboarding/{key}.md")
+    if d["services"]:
+        print(f"  services it seems to use: {', '.join(sorted(d['services']))} → /hub-dev-stack")
+    todo = "FACTORY-TODO" in checks.read_text()
+    print("  next: /hub-onboard in Claude Code" + (" (checks still have FACTORY-TODO lines)" if todo else ""))
+
+
+if __name__ == "__main__":
+    main()

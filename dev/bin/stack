@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Local services for the hub's repos, with podman (falls back to docker).
+#
+#   dev/bin/stack up [profile ...]    start the base services plus the given compose profiles
+#   dev/bin/stack down                stop everything (data volumes kept)
+#   dev/bin/stack reset               stop everything and delete the data volumes
+#   dev/bin/stack ps | logs [svc]     status / follow logs
+#   dev/bin/stack profiles            list the profiles in dev/compose.yaml
+#
+# Services without a profile always start. By convention each repo key is also a profile that
+# runs that app in a container (for working on the repos that call it); /hub-dev-stack writes them.
+set -euo pipefail
+DEV="$(cd "$(dirname "$0")/.." && pwd)"
+FILE="$DEV/compose.yaml"
+
+if podman compose version >/dev/null 2>&1; then COMPOSE=(podman compose)
+elif command -v podman-compose >/dev/null 2>&1; then COMPOSE=(podman-compose)
+elif docker compose version >/dev/null 2>&1; then COMPOSE=(docker compose)
+else echo "stack: need podman compose, podman-compose or docker compose" >&2; exit 1; fi
+
+profiles() { python3 - "$FILE" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+found = set()
+for m in re.finditer(r"profiles:\s*\[([^\]]*)\]", text):
+    found |= {p.strip().strip("'\"") for p in m.group(1).split(",") if p.strip()}
+for m in re.finditer(r"profiles:\s*\n((?:\s+-\s*.+\n)+)", text):
+    found |= {l.strip()[1:].strip().strip("'\"") for l in m.group(1).splitlines()}
+print(" ".join(sorted(found)))
+PY
+}
+all_profiles() { local a=() p; for p in $(profiles); do a+=(--profile "$p"); done; echo "${a[@]:-}"; }
+c() { "${COMPOSE[@]}" -f "$FILE" "$@"; }
+
+cmd="${1:-up}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  up)
+    if command -v podman >/dev/null && [ "$(podman machine inspect --format '{{.State}}' 2>/dev/null || echo none)" = "stopped" ]; then
+      echo "== podman machine start"; podman machine start
+    fi
+    args=(); for p in "$@"; do args+=(--profile "$p"); done
+    c ${args[@]+"${args[@]}"} up -d
+    c ${args[@]+"${args[@]}"} ps ;;
+  down) c $(all_profiles) down ;;
+  reset) c $(all_profiles) down -v ;;
+  ps) c $(all_profiles) ps ;;
+  logs) c $(all_profiles) logs -f "$@" ;;
+  profiles) profiles ;;
+  *) sed -n '2,12p' "$0"; exit 1 ;;
+esac

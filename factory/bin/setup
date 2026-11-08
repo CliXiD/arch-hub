@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Check that the hub is ready for the factory (re-runnable).
+#   factory/bin/setup            tools, hub remote, labels (creates missing ones), every repo's clone and base
+#   factory/bin/setup --checks   also runs every repo's checks on a clean worktree of its base branch
+set -uo pipefail
+HUB="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$HUB"
+ok=1
+say() { printf '%-8s %s\n' "$1" "$2"; }
+bad() { say FAIL "$1"; ok=0; }
+
+command -v python3 >/dev/null && python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' \
+  && say ok "python3 $(python3 -V | cut -d' ' -f2)" || bad "python3 3.10+ is required"
+command -v git >/dev/null && say ok "git $(git --version | cut -d' ' -f3)" || bad "git is required"
+command -v claude >/dev/null && say ok "claude $(claude --version 2>/dev/null | head -1)" || bad "claude CLI not on PATH"
+command -v gh >/dev/null && gh auth status >/dev/null 2>&1 && say ok "gh authenticated as $(gh api user --jq .login)" \
+  || bad "gh is missing or not logged in (gh auth login)"
+if [ -x factory/bin/copilot-sync ] && [ -d .claude ]; then
+  factory/bin/copilot-sync --check >/dev/null 2>&1 && say ok "GitHub Copilot mirrors (.github/skills, .github/agents) are up to date" \
+    || say info "GitHub Copilot mirrors are missing or stale: factory/bin/copilot-sync"
+fi
+command -v agent-browser >/dev/null && say ok "agent-browser found (UI reviewers will look at pages)" \
+  || say info "agent-browser not installed: UI/UX reviewers judge from code only"
+if command -v podman >/dev/null; then
+  { podman compose version >/dev/null 2>&1 || command -v podman-compose >/dev/null; } \
+    && say ok "podman with compose (dev/bin/stack)" \
+    || say info "podman has no compose provider: brew install podman-compose (only for dev/bin/stack)"
+elif command -v docker >/dev/null; then
+  say ok "docker (dev/bin/stack)"
+else
+  say info "no podman/docker: only needed for dev/bin/stack (local services), not for the gate"
+fi
+
+if HUBREPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null); then
+  say ok "hub repo $HUBREPO"
+  existing=$(gh label list --limit 300 --json name --jq '.[].name' 2>/dev/null)
+  python3 - "$HUB" <<'PY' | while IFS='|' read -r name color desc; do
+import json, sys
+labels = json.load(open(sys.argv[1] + "/factory/config.json"))["labels"]
+meta = {"queue": ("0E8A16", "Run by the software factory"),
+        "needs_info": ("FBCA04", "Factory is waiting for the author"),
+        "needs_human": ("D93F0B", "Factory needs a human decision"),
+        "awaiting_merge": ("1D76DB", "Approved by the factory; waiting for a person to merge")}
+for key, name in labels.items():
+    color, desc = meta.get(key, ("BFDADC", "Software factory"))
+    print(f"{name}|{color}|{desc}")
+PY
+    if printf '%s\n' "$existing" | grep -qx "$name"; then
+      say ok "label $name"
+    else
+      gh label create "$name" --color "$color" --description "$desc" >/dev/null && say made "label $name" || say FAIL "could not create label $name"
+    fi
+  done
+else
+  bad "the hub has no GitHub remote: create one (gh repo create) and git remote add origin <url>"
+fi
+
+python3 - "$HUB" <<'PY' || ok=0
+import json, os, shutil, subprocess, sys
+from pathlib import Path
+hub = Path(sys.argv[1])
+repos = json.loads((hub / "factory/repos.json").read_text())["repos"]
+if not repos:
+    print("FAIL     no repos yet: factory/bin/add-repo <git-url>")
+    sys.exit(1)
+failed = False
+needs_node = set()
+for key, r in repos.items():
+    path = hub / r["path"]
+    if not (path / ".git").exists():
+        print(f"FAIL     {key}: {r['path']} missing; factory/bin/add-repo {r.get('url') or r['remote']} --key {key}")
+        failed = True
+        continue
+    base = subprocess.run(["git", "ls-remote", "--heads", "origin", r["base"]], cwd=path, capture_output=True, text=True)
+    if base.returncode != 0 or not base.stdout.strip():
+        print(f"FAIL     {key}: can't see origin/{r['base']} ({base.stderr.strip() or 'no such branch'})")
+        failed = True
+        continue
+    checks = hub / (r.get("checks") or "")
+    todo = checks.is_file() and "FACTORY-TODO" in checks.read_text()
+    print(f"{'ok' if not todo else 'todo':8} {key}: {r['path']} → {r['remote']} (base {r['base']}, "
+          f"auto_merge {r.get('auto_merge', True)}){'; checks still a placeholder: run /hub-onboard' if todo else ''}")
+    for f in (".nvmrc", ".node-version"):
+        if (path / f).exists():
+            needs_node.add((path / f).read_text().strip().lstrip("v"))
+for v in sorted(needs_node):
+    if shutil.which("fnm") or (Path(os.environ.get("NVM_DIR", Path.home() / ".nvm")) / "nvm.sh").exists():
+        print(f"ok       fnm/nvm present: checks switch to Node {v} from .nvmrc")
+    else:
+        print(f"FAIL     a repo pins Node {v}: brew install fnm && fnm install {v}")
+        failed = True
+sys.exit(1 if failed else 0)
+PY
+
+if [ "${1:-}" = "--checks" ]; then
+  python3 - "$HUB" <<'PY' || ok=0
+import json, os, subprocess, sys
+from pathlib import Path
+hub = Path(sys.argv[1])
+repos = json.loads((hub / "factory/repos.json").read_text())["repos"]
+failed = False
+for key, r in repos.items():
+    path = hub / r["path"]
+    if not r.get("checks"):
+        print(f"skip     {key}: no checks configured")
+        continue
+    wt = hub / ".worktrees" / "_setup" / key
+    subprocess.run(["git", "fetch", "-q", "origin", r["base"]], cwd=path)
+    subprocess.run(["git", "worktree", "remove", "--force", str(wt)], cwd=path, capture_output=True)
+    subprocess.run(["git", "worktree", "prune"], cwd=path, capture_output=True)
+    subprocess.run(["git", "worktree", "add", "-q", "--detach", str(wt), f"origin/{r['base']}"], cwd=path, check=True)
+    env = dict(os.environ, FACTORY_HUB=str(hub), FACTORY_REPO_KEY=key, FACTORY_BASE=r["base"], CI="true")
+    print(f"== {key}: {r['checks']} on origin/{r['base']}", flush=True)
+    res = subprocess.run(["bash", str(hub / r["checks"])], cwd=wt, env=env, capture_output=True, text=True)
+    log = hub / ".worktrees" / "_setup" / f"{key}.log"
+    log.write_text(res.stdout + res.stderr)
+    print(f"{'ok' if res.returncode == 0 else 'FAIL':8} {key}: exit {res.returncode} (log: {log.relative_to(hub)})")
+    failed |= res.returncode != 0
+sys.exit(1 if failed else 0)
+PY
+fi
+
+[ "$ok" = 1 ] && echo "setup: ready" || { echo "setup: fix the FAIL lines above"; exit 1; }

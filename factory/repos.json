@@ -1,0 +1,12 @@
+{
+  "repos": {},
+  "merge_order": [],
+  "rules": [],
+  "branching": {
+    "strategy": "trunk",
+    "envs": [],
+    "release_prefix": "release/",
+    "release_current": null,
+    "sync": null
+  }
+}
