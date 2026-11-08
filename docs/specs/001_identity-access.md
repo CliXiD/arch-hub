@@ -33,7 +33,7 @@ use a service account. Every later spec relies on the `actor` and permission che
 ## Data
 
 - No user table: identity comes from the token. `actor` in [ADR-0005]'s `change_log` is the token `sub` plus a cached display name (`preferred_username`).
-- Team names in the `teams` claim must match `teams.name` in the model (see the model spec); a claim naming an unknown team grants nothing.
+- Team names in the `teams` claim must match `teams.id` in the model (see the model spec and [SPEC-admin-04]); a claim naming an unknown team grants nothing.
 
 ## Non-functional
 

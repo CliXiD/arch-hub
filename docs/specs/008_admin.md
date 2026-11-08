@@ -20,7 +20,7 @@ teams and the environments. Users and roles live in Keycloak ([ADR-0008]).
 
 ## Interfaces
 
-- `POST|PATCH|DELETE /api/v1/types/node[/{id}]`, `/api/v1/types/edge[/{id}]`, `/api/v1/teams[/{id}]`, `/api/v1/environments[/{id}]` (admin only).
+- `POST|PATCH|DELETE /api/v1/types/node[/{id}]`, `/api/v1/types/edge[/{id}]`, `/api/v1/teams[/{id}]`, `/api/v1/environments[/{id}]` (admin only). The team and environment write endpoints shipped with the write-API slice (hub issue #5); the type endpoints are still pending.
 - `GET /api/v1/history?actor=&entity=&source=&from=&to=` (viewer), the global audit query.
 
 ## Data

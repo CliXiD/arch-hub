@@ -71,7 +71,7 @@ services:
     command: ["/bin/sh", "/dev-scripts/start.sh"]
     env_file: env/arch-api.env
     environment:
-      DATABASE_URL: postgres://arch:arch@postgres:5432/arch?sslmode=disable
+      DATABASE_URL: postgres://arch_app:arch_app@postgres:5432/arch?sslmode=disable
       MIGRATE_DATABASE_URL: postgres://arch:arch@postgres:5432/arch?sslmode=disable
       OIDC_JWKS_URL: http://keycloak:8080/realms/arch/protocol/openid-connect/certs
       HTTP_ADDR: ":8080"
