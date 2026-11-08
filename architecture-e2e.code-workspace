@@ -6,11 +6,11 @@
     },
     {
       "path": "repos/arch-api",
-      "name": "arch-api (unknown)"
+      "name": "arch-api (go)"
     },
     {
       "path": "repos/arch-web",
-      "name": "arch-web (unknown)"
+      "name": "arch-web (node)"
     },
     {
       "path": "repos/arch-deploy",

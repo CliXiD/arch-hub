@@ -15,7 +15,7 @@
         "migrations/*"
       ],
       "auto_merge": true,
-      "stack": "unknown",
+      "stack": "go",
       "env": {
         "example": ".env.example",
         "target": ".env"
@@ -33,7 +33,7 @@
         ".github/*"
       ],
       "auto_merge": true,
-      "stack": "unknown",
+      "stack": "node",
       "env": {
         "example": ".env.example",
         "target": ".env"
