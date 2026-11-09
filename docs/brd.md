@@ -48,7 +48,7 @@ whole chain [S-001].
 - **BR-001** The model is a typed graph. Node types: Application/Service, Infrastructure resource (cluster, database, queue, bucket, ...), Network element (VPC, landing zone, transit gateway, VPN/Direct Connect, firewall, ...), External or on-prem system, and Project/Team. Edge types: `depends_on`, `calls` (with protocol and port), `runs_on`, `stores_data_in`, `routes_via` (network path) and `owned_by` — priority Must. [S-001]
 - **BR-002** Every node has an environment (for example dev, uat, prod) and an owner team — priority Must. Source: decided in /hub-init on 2026-11-08.
 - **BR-003** Admins can add node and edge types and their attributes without a code change — priority Must. Source: decided in /hub-init on 2026-11-08.
-- **BR-004** Every node and edge records where it came from (`ui`, `yaml`, and later `discovery` or `import`), so later ingestion paths fit in — priority Must. Source: decided in /hub-init on 2026-11-08.
+- **BR-004** Every node and edge records where it came from (`ui`, `api` for writes by a service account through the API, `yaml`, and later `discovery` or `import`), so later ingestion paths fit in — priority Must. Source: decided in /hub-init on 2026-11-08; `api` added in /grill-issue on 2026-11-09 (hub issue #18).
 
 ### Ingestion
 

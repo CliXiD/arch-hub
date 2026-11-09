@@ -10,7 +10,7 @@ teams and the environments. Users and roles live in Keycloak ([ADR-0008]).
 
 ## Behaviour
 
-- **SPEC-admin-01** `/admin/types` lists node types (by kind) and edge types. An admin can create a type, edit its name and attribute schema with a form-based schema editor (field name, data type, enum values, required), and, for edge types, edit the allowed kind pairs. [BR-003]
+- **SPEC-admin-01** `/admin/types` lists node types (by kind) and edge types. An admin can create a type, edit its name and attribute schema with a form-based schema editor (field name, data type, enum values, required), and, for edge types, edit the allowed kind pairs. The type write API (`/api/v1/admin/types/...`) ships first (hub issue #19); the page follows in a later slice. [BR-003]
 - **SPEC-admin-02** Changing a type's schema is checked against existing data. If existing nodes or edges would fail the new schema (for example a new required field without a default), the save fails with `409` and the problem gives a count of the failing items. Adding optional fields always succeeds. [BR-003]
 - **SPEC-admin-03** Built-in types ([SPEC-model-02]) can have attributes added but can't be deleted or renamed. A custom type can be deleted only when unused ([SPEC-model-09]). [BR-003]
 - **SPEC-admin-04** `/admin/teams` lists teams with their node counts. An admin can create a team (id slug and name) and rename one. Deleting a team is allowed only when it owns no nodes. The page explains that team ids must match the Keycloak group names ([SPEC-identity-access-05]). [BR-041]
