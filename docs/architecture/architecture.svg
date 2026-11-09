@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" viewBox="0 0 1200 860" role="img" aria-labelledby="t d">
+<title id="t">Architecture E2E — prod architecture</title>
+<desc id="d">13 nodes and 22 edges from GET /api/v1/graph.</desc>
+<style>
+:root{--bg:#ffffff;--fg:#1f2328;--muted:#59636e;--lane:#f6f8fa;--laneline:#d1d9e0;
+--app:#ddf4ff;--app-s:#0969da;--infra:#dafbe1;--infra-s:#1a7f37;--net:#fbefff;--net-s:#8250df;
+--ext:#fff1e5;--ext-s:#bc4c00;--team:#eaeef2;--team-s:#59636e;
+--calls:#0969da;--data:#1a7f37;--dep:#6e7781;--run:#8250df;--route:#8250df;--own:#6e7781;
+--chip:#ffffff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--lane:#151b23;
+--laneline:#3d444d;--app:#0c2d6b;--app-s:#4493f8;--infra:#0f3d1f;--infra-s:#3fb950;--net:#2b1a4a;
+--net-s:#ab7df8;--ext:#3d1d00;--ext-s:#f0883e;--team:#21262d;--team-s:#9198a1;--calls:#4493f8;
+--data:#3fb950;--dep:#9198a1;--run:#ab7df8;--route:#ab7df8;--own:#9198a1;--chip:#0d1117}}
+svg{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif}
+.bg{fill:var(--bg)} .t{fill:var(--fg)} .m{fill:var(--muted)}
+.title{font-size:22px;font-weight:600} .sub{font-size:13px} .lane-t{font-size:11px;font-weight:600;
+letter-spacing:.08em;text-transform:uppercase} .lane{fill:var(--lane);stroke:var(--laneline)}
+.n-name{font-size:13px;font-weight:600} .n-type{font-size:11px}
+.k-app{fill:var(--app);stroke:var(--app-s)} .k-infra{fill:var(--infra);stroke:var(--infra-s)}
+.k-net{fill:var(--net);stroke:var(--net-s)} .k-ext{fill:var(--ext);stroke:var(--ext-s)}
+.k-team{fill:var(--team);stroke:var(--team-s)}
+.edge{fill:none;stroke-width:1.6} .e-calls{stroke:var(--calls)} .e-data{stroke:var(--data)}
+.e-dep{stroke:var(--dep);stroke-dasharray:5 4} .e-run{stroke:var(--run);stroke-dasharray:2 3}
+.e-route{stroke:var(--route)} .e-own{stroke:var(--own)}
+.a-calls{fill:var(--calls)} .a-data{fill:var(--data)} .a-dep{fill:var(--dep)} .a-run{fill:var(--run)}
+.a-route{fill:var(--route)} .a-own{fill:var(--own)}
+.chip{fill:var(--chip);stroke:var(--laneline)} .lbl{font-size:10.5px} .lbl-k{font-size:9.5px;font-weight:600}
+.helm{fill:none;stroke:var(--muted);stroke-dasharray:6 4} .helm-t{font-size:11px;font-style:italic}
+.small{font-size:11px} .halo{paint-order:stroke;stroke:var(--lane);stroke-width:5px;stroke-linejoin:round}
+</style>
+<rect class="bg" width="1200" height="860"/>
+<text class="t title" x="40" y="44">Architecture E2E — how the product is built and deployed</text>
+<text class="m sub" x="40" y="66">Environment <tspan font-weight="600">prod</tspan> · 13 nodes · 22 edges · modelled in the product itself through its own write API</text>
+<rect class="lane" x="20" y="86" width="900" height="107.0" rx="10"/>
+<rect class="lane" x="20" y="366" width="900" height="107.0" rx="10"/>
+<rect class="lane" x="20" y="616" width="900" height="107.0" rx="10"/>
+<rect class="lane" x="940" y="366" width="240" height="259.0" rx="10"/>
+<text class="m lane-t" x="954" y="384">Build &amp; deploy</text>
+<rect class="k-net" x="24.0" y="258" width="892.0" height="52" rx="10" fill-opacity="0.55" stroke-width="1.2"/>
+<text class="t n-name" x="36.0" y="278"><tspan class="m lane-t">Network</tspan><tspan dx="10">Application VPC</tspan><tspan class="m n-type" font-weight="400" dx="8">network · vpc</tspan></text>
+<text class="m small" x="36.0" y="298"><tspan font-weight="600">routes_via ←</tspan> arch CLI, PostgreSQL 16 (RDS), EKS cluster, Users&#x27; browsers</text>
+<rect class="helm" x="71.33333333333334" y="392.0" width="797.3333333333334" height="76.0" rx="8"/>
+<defs>
+<marker id="m-calls" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-calls" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="m-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-data" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="m-dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-dep" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="m-own" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-own" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="m-route" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-route" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="m-run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-run" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<path class="edge e-calls" d="M486.6,459.0 C486.6,565.4 536.0,544.6 536.0,651.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M453.4,459.0 C453.4,565.4 362.5,544.6 362.5,651.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M442.3,179.0 C442.3,298.9 442.3,281.1 442.3,401.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M497.7,179.0 C497.7,304.5 598.2,304.5 598.2,430.0 C598.2,540.5 577.5,540.5 577.5,651.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M715.2,179.0 C715.2,298.9 497.7,281.1 497.7,401.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M798.2,179.0 C798.2,298.9 756.7,281.1 756.7,401.0" marker-end="url(#m-calls)"/>
+<path class="edge e-calls" d="M756.7,179.0 C756.7,304.5 628.4,304.5 628.4,430.0 C628.4,540.5 619.0,540.5 619.0,651.0" marker-end="url(#m-calls)"/>
+<path class="edge e-dep" d="M519.8,459.0 C519.8,601.7 792.5,508.3 792.5,651.0" marker-end="url(#m-dep)"/>
+<path class="edge e-dep" d="M658.7,430.0 C597.9,430.0 628.8,430.0 568.0,430.0" marker-end="url(#m-dep)"/>
+<path class="edge e-dep" d="M281.3,150.0 C342.1,150.0 311.2,150.0 372.0,150.0" marker-end="url(#m-dep)"/>
+<path class="edge e-data" d="M420.2,459.0 C420.2,589.3 175.2,520.7 175.2,651.0" marker-end="url(#m-data)"/>
+<path class="edge e-data" d="M183.3,459.0 C183.3,565.4 119.8,544.6 119.8,651.0" marker-end="url(#m-data)"/>
+<path class="edge e-dep" d="M868.7,440.0 C951.7,440.0 879.0,580.0 962.0,580.0" marker-end="url(#m-dep)"/>
+<path class="edge e-run" d="M868.7,420.0 C930.7,420.0 900.0,430.0 962.0,430.0" marker-end="url(#m-run)"/>
+<rect class="k-app" x="372.0" y="121.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="470.0" y="147.0" text-anchor="middle">arch CLI</text>
+<text class="m n-type" x="470.0" y="165.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="85.3" y="121.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="183.3" y="147.0" text-anchor="middle">Team CI pipelines</text>
+<text class="m n-type" x="183.3" y="165.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="658.7" y="121.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="756.7" y="147.0" text-anchor="middle">Users&#x27; browsers</text>
+<text class="m n-type" x="756.7" y="165.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="372.0" y="401.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="470.0" y="427.0" text-anchor="middle">arch-api</text>
+<text class="m n-type" x="470.0" y="445.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="85.3" y="401.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="183.3" y="427.0" text-anchor="middle">arch-api migrate job</text>
+<text class="m n-type" x="183.3" y="445.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="658.7" y="401.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="756.7" y="427.0" text-anchor="middle">arch-web</text>
+<text class="m n-type" x="756.7" y="445.0" text-anchor="middle">application · service</text>
+<rect class="k-app" x="264.5" y="651.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="362.5" y="677.0" text-anchor="middle">OTLP trace collector</text>
+<text class="m n-type" x="362.5" y="695.0" text-anchor="middle">application · service</text>
+<rect class="k-ext" x="479.5" y="651.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="577.5" y="677.0" text-anchor="middle">Keycloak realm arch</text>
+<text class="m n-type" x="577.5" y="695.0" text-anchor="middle">external · saas</text>
+<rect class="k-ext" x="694.5" y="651.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="792.5" y="677.0" text-anchor="middle">AWS Secrets Manager</text>
+<text class="m n-type" x="792.5" y="695.0" text-anchor="middle">external · saas</text>
+<rect class="k-infra" x="49.5" y="651.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="147.5" y="677.0" text-anchor="middle">PostgreSQL 16 (RDS)</text>
+<text class="m n-type" x="147.5" y="695.0" text-anchor="middle">infrastructure · database</text>
+<rect class="k-ext" x="962.0" y="551.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="1060.0" y="577.0" text-anchor="middle">GHCR</text>
+<text class="m n-type" x="1060.0" y="595.0" text-anchor="middle">external · saas</text>
+<rect class="k-infra" x="962.0" y="401.0" width="196" height="58" rx="9" stroke-width="1.4"/>
+<text class="t n-name" x="1060.0" y="427.0" text-anchor="middle">EKS cluster</text>
+<text class="m n-type" x="1060.0" y="445.0" text-anchor="middle">infrastructure · k8s-cluster</text>
+<text class="m lane-t halo" x="34" y="104">Clients &amp; CI</text>
+<text class="m lane-t halo" x="34" y="384">Applications</text>
+<text class="m lane-t halo" x="34" y="634">Platform, data &amp; observability</text>
+<rect class="chip" x="450.7" y="546.5" width="121.2" height="17" rx="8.5"/><text x="456.7" y="558.5"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">JWKS HTTPS 443</tspan></text>
+<rect class="chip" x="374.0" y="518.8" width="119.5" height="17" rx="8.5"/><text x="380.0" y="530.8"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">OTLP gRPC 4317</tspan></text>
+<rect class="chip" x="339.7" y="314.3" width="205.2" height="17" rx="8.5"/><text x="345.7" y="326.3"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">HTTPS 443 /api/v1/import (YAML)</tspan></text>
+<rect class="chip" x="497.9" y="515.2" width="186.1" height="17" rx="8.5"/><text x="503.9" y="527.2"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">OIDC client creds HTTPS 443</tspan></text>
+<rect class="chip" x="624.1" y="232.6" width="128.2" height="17" rx="8.5"/><text x="630.1" y="244.6"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">HTTPS 443 /api/v1</tspan></text>
+<rect class="chip" x="716.3" y="314.3" width="98.6" height="17" rx="8.5"/><text x="722.3" y="326.3"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">HTTPS 443 /</tspan></text>
+<rect class="chip" x="580.8" y="335.7" width="150.7" height="17" rx="8.5"/><text x="586.8" y="347.7"><tspan class="lbl-k a-calls">calls</tspan><tspan class="t lbl" dx="5">OIDC PKCE HTTPS 443</tspan></text>
+<rect class="chip" x="588.5" y="554.4" width="216.0" height="17" rx="8.5"/><text x="594.5" y="566.4"><tspan class="lbl-k a-dep">depends_on</tspan><tspan class="t lbl" dx="5">secrets via external secrets</tspan></text>
+<rect class="chip" x="538.9" y="463.5" width="148.8" height="17" rx="8.5"/><text x="544.9" y="475.5"><tspan class="lbl-k a-dep">depends_on</tspan><tspan class="t lbl" dx="5">api/openapi.yaml</tspan></text>
+<rect class="chip" x="253.6" y="183.5" width="146.2" height="17" rx="8.5"/><text x="259.6" y="195.5"><tspan class="lbl-k a-dep">depends_on</tspan><tspan class="t lbl" dx="5">arch push in CI</tspan></text>
+<rect class="chip" x="200.9" y="546.5" width="193.6" height="17" rx="8.5"/><text x="206.9" y="558.5"><tspan class="lbl-k a-data">stores_data_in</tspan><tspan class="t lbl" dx="5">pgx 5432 as arch_app</tspan></text>
+<rect class="chip" x="84.2" y="518.8" width="170.9" height="17" rx="8.5"/><text x="90.2" y="530.8"><tspan class="lbl-k a-data">stores_data_in</tspan><tspan class="t lbl" dx="5">pgx 5432 as arch</tspan></text>
+<rect class="chip" x="850.1" y="501.5" width="130.4" height="17" rx="8.5"/><text x="856.1" y="513.5"><tspan class="lbl-k a-dep">depends_on ×3</tspan><tspan class="t lbl" dx="5">image pull</tspan></text>
+<rect class="chip" x="875.5" y="374.5" width="239.7" height="17" rx="8.5"/><text x="881.5" y="386.5"><tspan class="lbl-k a-run">runs_on ×3</tspan><tspan class="t lbl" dx="5">deployment / helm pre-upgrade job</tspan></text>
+<rect class="chip" x="737.3" y="383.0" width="119.4" height="18" rx="9"/><text class="m helm-t" x="744.3" y="396.0">Helm release “arch”</text>
+<text class="m lane-t" x="40" y="768">Legend</text>
+<rect class="k-app" x="40" y="780" width="22" height="14" rx="4" stroke-width="1.2"/>
+<text class="t small" x="68" y="791">application</text>
+<rect class="k-ext" x="134.41" y="780" width="22" height="14" rx="4" stroke-width="1.2"/>
+<text class="t small" x="162.41" y="791">external</text>
+<rect class="k-infra" x="215.62" y="780" width="22" height="14" rx="4" stroke-width="1.2"/>
+<text class="t small" x="243.62" y="791">infrastructure</text>
+<rect class="k-net" x="332.47" y="780" width="22" height="14" rx="4" stroke-width="1.2"/>
+<text class="t small" x="360.47" y="791">network</text>
+<path class="edge e-calls" d="M420.93000000000006,787 h30" marker-end="url(#m-calls)"/>
+<text class="t small" x="458.93000000000006" y="791">calls</text>
+<path class="edge e-data" d="M496.01000000000005,787 h30" marker-end="url(#m-data)"/>
+<text class="t small" x="534.01" y="791">stores_data_in</text>
+<path class="edge e-dep" d="M626.8600000000001,787 h30" marker-end="url(#m-dep)"/>
+<text class="t small" x="664.8600000000001" y="791">depends_on</text>
+<path class="edge e-run" d="M736.2600000000001,787 h30" marker-end="url(#m-run)"/>
+<text class="t small" x="774.2600000000001" y="791">runs_on</text>
+<rect class="helm" x="827.8400000000001" y="779" width="26" height="16" rx="4"/><text class="t small" x="859.8400000000001" y="791">Helm release (tag helm:&lt;name&gt;)</text>
+<text class="m small" x="40" y="816">Owner of every node: team platform. Edge chips: edge type, then its key attributes (protocol, port, path, auth flow, database role).</text>
+<text class="m small" x="40" y="842">Generated from Architecture E2E's own model (GET /api/v1/graph) by docs/architecture/render.py</text>
+</svg>

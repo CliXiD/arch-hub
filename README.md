@@ -3,6 +3,14 @@
 One place to work on the project's repos together, by hand or through the software
 factory. Created from the grill-me-factory template.
 
+## Architecture
+
+The product as built and deployed in `prod`, modelled in Architecture E2E itself through its
+own API and drawn from `GET /api/v1/graph`. How it was made, how to regenerate it and what the
+dogfooding turned up: [docs/architecture/README.md](docs/architecture/README.md).
+
+![Architecture E2E architecture](docs/architecture/architecture.svg)
+
 ## Daily use
 
 - Open `architecture-e2e.code-workspace` in VS Code (File → Open Workspace from File…).

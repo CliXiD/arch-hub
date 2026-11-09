@@ -1,0 +1,387 @@
+{
+  "environment": "prod",
+  "nodes": [
+    {
+      "id": "app-vpc",
+      "kind": "network",
+      "type": "vpc",
+      "name": "Application VPC",
+      "owner": "platform",
+      "tags": [
+        "network"
+      ]
+    },
+    {
+      "id": "arch-api",
+      "kind": "application",
+      "type": "service",
+      "name": "arch-api",
+      "owner": "platform",
+      "tags": [
+        "app",
+        "helm:arch"
+      ]
+    },
+    {
+      "id": "arch-cli",
+      "kind": "application",
+      "type": "service",
+      "name": "arch CLI",
+      "owner": "platform",
+      "tags": [
+        "client",
+        "cli"
+      ]
+    },
+    {
+      "id": "arch-db",
+      "kind": "infrastructure",
+      "type": "database",
+      "name": "PostgreSQL 16 (RDS)",
+      "owner": "platform",
+      "tags": [
+        "data",
+        "platform"
+      ]
+    },
+    {
+      "id": "arch-migrate",
+      "kind": "application",
+      "type": "service",
+      "name": "arch-api migrate job",
+      "owner": "platform",
+      "tags": [
+        "app",
+        "job",
+        "helm:arch"
+      ]
+    },
+    {
+      "id": "arch-web",
+      "kind": "application",
+      "type": "service",
+      "name": "arch-web",
+      "owner": "platform",
+      "tags": [
+        "app",
+        "helm:arch"
+      ]
+    },
+    {
+      "id": "eks",
+      "kind": "infrastructure",
+      "type": "k8s-cluster",
+      "name": "EKS cluster",
+      "owner": "platform",
+      "tags": [
+        "build",
+        "deploy",
+        "cluster"
+      ]
+    },
+    {
+      "id": "ghcr",
+      "kind": "external",
+      "type": "saas",
+      "name": "GHCR",
+      "owner": "platform",
+      "tags": [
+        "build",
+        "registry"
+      ]
+    },
+    {
+      "id": "keycloak",
+      "kind": "external",
+      "type": "saas",
+      "name": "Keycloak realm arch",
+      "owner": "platform",
+      "tags": [
+        "identity",
+        "platform"
+      ]
+    },
+    {
+      "id": "otel-collector",
+      "kind": "application",
+      "type": "service",
+      "name": "OTLP trace collector",
+      "owner": "platform",
+      "tags": [
+        "observability",
+        "platform"
+      ]
+    },
+    {
+      "id": "secrets-manager",
+      "kind": "external",
+      "type": "saas",
+      "name": "AWS Secrets Manager",
+      "owner": "platform",
+      "tags": [
+        "secrets",
+        "platform"
+      ]
+    },
+    {
+      "id": "team-ci",
+      "kind": "application",
+      "type": "service",
+      "name": "Team CI pipelines",
+      "owner": "platform",
+      "tags": [
+        "client",
+        "ci"
+      ]
+    },
+    {
+      "id": "users-browser",
+      "kind": "application",
+      "type": "service",
+      "name": "Users' browsers",
+      "owner": "platform",
+      "tags": [
+        "client",
+        "users"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "uid": "d7aef4de-4c3a-4e03-a084-6ef644544222",
+      "type": "calls",
+      "from": "arch-api",
+      "to": "keycloak",
+      "attributes": {
+        "path": "/realms/arch/protocol/openid-connect/certs",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "jwks"
+      }
+    },
+    {
+      "uid": "f002fe69-954b-4f12-b19b-8ff70391ff25",
+      "type": "calls",
+      "from": "arch-api",
+      "to": "otel-collector",
+      "attributes": {
+        "port": 4317,
+        "protocol": "grpc",
+        "purpose": "otlp traces"
+      }
+    },
+    {
+      "uid": "8f18a73c-9c3f-4884-8005-1396700200fa",
+      "type": "calls",
+      "from": "arch-cli",
+      "to": "arch-api",
+      "attributes": {
+        "path": "/api/v1/import",
+        "payload": "yaml",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "import"
+      }
+    },
+    {
+      "uid": "ad51ba98-f803-406a-92d8-b4db9594573d",
+      "type": "calls",
+      "from": "arch-cli",
+      "to": "keycloak",
+      "attributes": {
+        "flow": "oidc client credentials",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "service token"
+      }
+    },
+    {
+      "uid": "81b31583-a935-4a4e-bf27-2f3849a4f2e3",
+      "type": "calls",
+      "from": "users-browser",
+      "to": "arch-api",
+      "attributes": {
+        "auth": "bearer jwt",
+        "path": "/api/v1",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "REST API",
+        "via": "ingress"
+      }
+    },
+    {
+      "uid": "cf9c7d2a-6e7e-4648-be6d-59cdb761ccb0",
+      "type": "calls",
+      "from": "users-browser",
+      "to": "arch-web",
+      "attributes": {
+        "path": "/",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "SPA assets",
+        "via": "ingress"
+      }
+    },
+    {
+      "uid": "f8faad43-a00d-4e5b-bd20-8e577c906615",
+      "type": "calls",
+      "from": "users-browser",
+      "to": "keycloak",
+      "attributes": {
+        "flow": "oidc auth code + pkce",
+        "port": 443,
+        "protocol": "https",
+        "purpose": "sign-in"
+      }
+    },
+    {
+      "uid": "91489997-2ed5-47de-ab04-02c7778f8a94",
+      "type": "depends_on",
+      "from": "arch-api",
+      "to": "ghcr",
+      "attributes": {
+        "image": "arch-api",
+        "purpose": "image pull"
+      }
+    },
+    {
+      "uid": "42bb1d3c-6054-49b4-bdc9-ef06be499c1a",
+      "type": "depends_on",
+      "from": "arch-api",
+      "to": "secrets-manager",
+      "attributes": {
+        "purpose": "secrets via external secrets"
+      }
+    },
+    {
+      "uid": "af2aaaff-4915-4aa5-af53-3691a8512ad9",
+      "type": "depends_on",
+      "from": "arch-migrate",
+      "to": "ghcr",
+      "attributes": {
+        "image": "arch-api",
+        "purpose": "image pull"
+      }
+    },
+    {
+      "uid": "34d81edb-1402-4931-ad3f-9fe67f67c532",
+      "type": "depends_on",
+      "from": "arch-web",
+      "to": "arch-api",
+      "attributes": {
+        "contract": "api/openapi.yaml",
+        "purpose": "generated client"
+      }
+    },
+    {
+      "uid": "56fc0047-e330-4248-be5f-19e7d7a56d79",
+      "type": "depends_on",
+      "from": "arch-web",
+      "to": "ghcr",
+      "attributes": {
+        "image": "arch-web",
+        "purpose": "image pull"
+      }
+    },
+    {
+      "uid": "28b1db52-60c6-4106-9709-2b03c4fcf48a",
+      "type": "depends_on",
+      "from": "team-ci",
+      "to": "arch-cli",
+      "attributes": {
+        "purpose": "arch push in CI"
+      }
+    },
+    {
+      "uid": "d3e8bf95-85eb-44ee-a594-f235b2850435",
+      "type": "routes_via",
+      "from": "arch-cli",
+      "to": "app-vpc",
+      "attributes": {
+        "entry": "ingress",
+        "port": 443,
+        "protocol": "https"
+      }
+    },
+    {
+      "uid": "21da0fea-1986-4002-8443-e11a8913c79f",
+      "type": "routes_via",
+      "from": "arch-db",
+      "to": "app-vpc",
+      "attributes": {
+        "port": 5432,
+        "role": "private subnets"
+      }
+    },
+    {
+      "uid": "84489d54-2ffa-41eb-b304-5f40db0688ce",
+      "type": "routes_via",
+      "from": "eks",
+      "to": "app-vpc",
+      "attributes": {
+        "role": "cluster network"
+      }
+    },
+    {
+      "uid": "6df13460-7719-4b50-89ff-c267157018d8",
+      "type": "routes_via",
+      "from": "users-browser",
+      "to": "app-vpc",
+      "attributes": {
+        "entry": "ingress",
+        "port": 443,
+        "protocol": "https"
+      }
+    },
+    {
+      "uid": "6344ddde-3589-4219-a536-43ce166057ce",
+      "type": "runs_on",
+      "from": "arch-api",
+      "to": "eks",
+      "attributes": {
+        "workload": "deployment"
+      }
+    },
+    {
+      "uid": "3b4f1066-2b8e-42c1-bbf1-6872c18b7f27",
+      "type": "runs_on",
+      "from": "arch-migrate",
+      "to": "eks",
+      "attributes": {
+        "workload": "helm pre-upgrade job"
+      }
+    },
+    {
+      "uid": "809fe552-3e05-41a3-8ffc-b405c4940f94",
+      "type": "runs_on",
+      "from": "arch-web",
+      "to": "eks",
+      "attributes": {
+        "workload": "deployment"
+      }
+    },
+    {
+      "uid": "0eac641d-3b18-45da-b47b-80ed14d5044d",
+      "type": "stores_data_in",
+      "from": "arch-api",
+      "to": "arch-db",
+      "attributes": {
+        "port": 5432,
+        "protocol": "pgx",
+        "role": "arch_app"
+      }
+    },
+    {
+      "uid": "e80b0cb9-cac0-4622-9975-bc7628cd16fd",
+      "type": "stores_data_in",
+      "from": "arch-migrate",
+      "to": "arch-db",
+      "attributes": {
+        "port": 5432,
+        "protocol": "pgx",
+        "purpose": "goose migrations",
+        "role": "arch"
+      }
+    }
+  ]
+}
