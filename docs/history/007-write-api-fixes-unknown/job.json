@@ -1,0 +1,70 @@
+{
+  "id": "007-write-api-fixes-unknown",
+  "issue": 18,
+  "title": "Write API fixes: unknown owner is a 422, `api` source for service writes, kind-pair error points at the right field",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/18",
+  "branch": "factory/007-write-api-fixes-unknown",
+  "stage": "merged",
+  "round": 2,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 5.15,
+  "started": "2026-11-11T01:53:21Z",
+  "ended": "2026-11-11T04:03:19Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "caf60f6f2f32e1a2e794a562351b8c8ce8de4fc3",
+      "prs": {
+        "main": {
+          "pr": 8,
+          "url": "https://github.com/CliXiD/arch-api/pull/8",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "e7307adbcacaea0de1c0596e3606adc0fab1fcf2",
+      "prs": {
+        "main": {
+          "pr": 6,
+          "url": "https://github.com/CliXiD/arch-web/pull/6",
+          "merged": true
+        }
+      }
+    }
+  }
+}

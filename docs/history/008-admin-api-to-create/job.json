@@ -1,0 +1,70 @@
+{
+  "id": "008-admin-api-to-create",
+  "issue": 19,
+  "title": "Admin API to create and edit node and edge types",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/19",
+  "branch": "factory/008-admin-api-to-create",
+  "stage": "merged",
+  "round": 2,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api",
+      "arch-web"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS",
+    "contract": "PASS"
+  },
+  "cost_usd": 10.09,
+  "started": "2026-11-11T02:07:01Z",
+  "ended": "2026-11-11T07:56:39Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet",
+    "contract": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "c8101f17cc9a0d1fbf29c0d317af418101a13f06",
+      "prs": {
+        "main": {
+          "pr": 9,
+          "url": "https://github.com/CliXiD/arch-api/pull/9",
+          "merged": true
+        }
+      }
+    },
+    "arch-web": {
+      "remote": "CliXiD/arch-web",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "76a020f5cc6bcfbf6d5c32bcc8a8198752832161",
+      "prs": {
+        "main": {
+          "pr": 7,
+          "url": "https://github.com/CliXiD/arch-web/pull/7",
+          "merged": true
+        }
+      }
+    }
+  }
+}
