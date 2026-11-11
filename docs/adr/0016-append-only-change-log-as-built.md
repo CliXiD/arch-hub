@@ -26,11 +26,13 @@ Option 2. This supersedes [ADR-0005]; its approach (one row per change, same tra
 by the service layer, never updated or deleted) stands.
 
 - **Columns:** `id bigserial PRIMARY KEY`, `at timestamptz NOT NULL DEFAULT now()`, `actor text`,
-  `actor_name text`, `actor_kind` user|service, `source` ui|yaml|discovery|import, `entity`
+  `actor_name text`, `actor_kind` user|service, `source` ui|api|yaml|discovery|import (`api` for a service account's write, hub issue #18), `entity`
   node|edge|type|team|environment, `entity_key text`, `action` create|update|delete, `before jsonb`,
   `after jsonb`, with `CHECK (before IS NOT NULL OR after IS NOT NULL)`. `before`/`after` hold the
   entity's API JSON; `before` is null on create, `after` null on delete.
-- **`entity_key`:** node `<environment>/<id>`, edge `<uid>`, team `<id>`, environment `<id>`.
+- **`entity_key`:** node `<environment>/<id>`, edge `<uid>`, type `node/<id>` or `edge/<id>` (node and
+  edge type ids may collide; hub issue #19), team `<id>`, environment `<id>`. A type row's `before` and
+  `after` hold the whole type: name, attribute schema and, for an edge type, its allowed pairs.
 - **Append-only trigger:** `change_log_reject()` raises an exception; it runs `BEFORE UPDATE OR
   DELETE ... FOR EACH ROW` and `BEFORE TRUNCATE ... FOR EACH STATEMENT`, so it applies to every role,
   including the owner.

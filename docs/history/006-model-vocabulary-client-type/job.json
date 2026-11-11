@@ -1,0 +1,49 @@
+{
+  "id": "006-model-vocabulary-client-type",
+  "issue": 17,
+  "title": "Model vocabulary: client type, more built-in types, external callers, richer edge attributes",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/17",
+  "branch": "factory/006-model-vocabulary-client-type",
+  "stage": "merged",
+  "round": 1,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [],
+    "repos": [
+      "arch-api"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "db": "PASS"
+  },
+  "cost_usd": 2.84,
+  "started": "2026-11-11T01:41:44Z",
+  "ended": "2026-11-11T03:54:31Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "db": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "8367ce112a246283f4d99f0f1041606fc3bc32c5",
+      "prs": {
+        "main": {
+          "pr": 7,
+          "url": "https://github.com/CliXiD/arch-api/pull/7",
+          "merged": true
+        }
+      }
+    }
+  }
+}

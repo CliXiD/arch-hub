@@ -6,6 +6,9 @@ docs/adr say how the system works now. Commits carry `Factory-Job: <job-id>` tra
 
 | Job | Issue | Title | Outcome | Repos | Ended |
 |---|---|---|---|---|---|
+| [008-admin-api-to-create](008-admin-api-to-create/README.md) | #19 | Admin API to create and edit node and edge types | merged | arch-api, arch-web | 2026-11-11 |
+| [007-write-api-fixes-unknown](007-write-api-fixes-unknown/README.md) | #18 | Write API fixes: unknown owner is a 422, `api` source for service writes, kind-pair error points at the right field | merged | arch-api, arch-web | 2026-11-11 |
+| [006-model-vocabulary-client-type](006-model-vocabulary-client-type/README.md) | #17 | Model vocabulary: client type, more built-in types, external callers, richer edge attributes | merged | arch-api | 2026-11-11 |
 | [005-write-api-hardening-follow](005-write-api-hardening-follow/README.md) | #14 | Write API hardening follow-ups from job 004 | merged | arch-api | 2026-11-08 |
 | [004-write-api-for-nodes](004-write-api-for-nodes/README.md) | #5 | Write API for nodes, edges, teams and environments with change log | merged | arch-api, arch-web | 2026-11-08 |
 | [003-harden-auth-and-http](003-harden-auth-and-http/README.md) | #7 | Harden auth and HTTP server after the walking skeleton | merged | arch-api, arch-web | 2026-11-08 |
