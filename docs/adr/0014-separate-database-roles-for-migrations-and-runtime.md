@@ -31,4 +31,5 @@ everyone. An integration test checks both.
 - `arch_app` must exist before `migrate up`: the hub dev stack creates it (`dev/postgres/init`);
   the deploy slice provisions it on RDS and stores both connection strings in External Secrets ([ADR-0012]).
 - New env var `MIGRATE_DATABASE_URL` in `arch-api`'s `.env.example` and in `arch-deploy` values.
+- `arch-api teams add` also connects as the owner, so an operator can create the first teams on a fresh database without a login; it writes change_log through the same code path as the API (source `api`).
 - The dev stack keeps `DATABASE_URL` on the owner until the write-API slice (which adds the grants) merges, then switches it to `arch_app`.

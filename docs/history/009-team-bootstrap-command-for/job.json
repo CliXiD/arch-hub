@@ -1,0 +1,53 @@
+{
+  "id": "009-team-bootstrap-command-for",
+  "issue": 20,
+  "title": "Team bootstrap command for a fresh database",
+  "issue_url": "https://github.com/CliXiD/arch-hub/issues/20",
+  "branch": "factory/009-team-bootstrap-command-for",
+  "stage": "merged",
+  "round": 1,
+  "intake": {
+    "decision": "ACCEPT",
+    "rescoped": false,
+    "risk": "high",
+    "surfaces": [
+      "security"
+    ],
+    "repos": [
+      "arch-api"
+    ]
+  },
+  "gate": "PASS",
+  "reviews": {
+    "code": "PASS",
+    "security": "PASS",
+    "db": "PASS"
+  },
+  "cost_usd": 3.29,
+  "started": "2026-11-16T05:53:34Z",
+  "ended": "2026-11-18T01:09:48Z",
+  "shipped": null,
+  "hub": "CliXiD/arch-hub",
+  "strategy": "trunk",
+  "reviewers": {
+    "code": "sonnet",
+    "security": "opus",
+    "db": "sonnet"
+  },
+  "repos": {
+    "arch-api": {
+      "remote": "CliXiD/arch-api",
+      "base": "main",
+      "target": "main",
+      "changed": true,
+      "head": "e856aa27fdd4e23a9c377446f2ef8934d6f17a8b",
+      "prs": {
+        "main": {
+          "pr": 10,
+          "url": "https://github.com/CliXiD/arch-api/pull/10",
+          "merged": true
+        }
+      }
+    }
+  }
+}

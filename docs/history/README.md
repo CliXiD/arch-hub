@@ -6,6 +6,7 @@ docs/adr say how the system works now. Commits carry `Factory-Job: <job-id>` tra
 
 | Job | Issue | Title | Outcome | Repos | Ended |
 |---|---|---|---|---|---|
+| [009-team-bootstrap-command-for](009-team-bootstrap-command-for/README.md) | #20 | Team bootstrap command for a fresh database | merged | arch-api | 2026-11-18 |
 | [008-admin-api-to-create](008-admin-api-to-create/README.md) | #19 | Admin API to create and edit node and edge types | merged | arch-api, arch-web | 2026-11-11 |
 | [007-write-api-fixes-unknown](007-write-api-fixes-unknown/README.md) | #18 | Write API fixes: unknown owner is a 422, `api` source for service writes, kind-pair error points at the right field | merged | arch-api, arch-web | 2026-11-11 |
 | [006-model-vocabulary-client-type](006-model-vocabulary-client-type/README.md) | #17 | Model vocabulary: client type, more built-in types, external callers, richer edge attributes | merged | arch-api | 2026-11-11 |
