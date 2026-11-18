@@ -21,9 +21,10 @@ and deployment.
 
 ## Interfaces
 
-- `arch-api` env: `DATABASE_URL` (runtime role), `MIGRATE_DATABASE_URL` (owner, used by `migrate`; defaults to `DATABASE_URL`, [ADR-0014]), `HTTP_ADDR`, `METRICS_ADDR`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `LOG_LEVEL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `CORS_ORIGINS`.
+- `arch-api` env: `DATABASE_URL` (runtime role), `MIGRATE_DATABASE_URL` (owner, used by `migrate` and `teams add`; defaults to `DATABASE_URL`, [ADR-0014]), `HTTP_ADDR`, `METRICS_ADDR`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `LOG_LEVEL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `CORS_ORIGINS`.
 - `arch-web` `/config.json`: `apiBaseUrl`, `oidcAuthority`, `oidcClientId`.
 - `arch-api migrate up|status` subcommand.
+- `arch-api teams add <id> --name <name>` subcommand: creates a team as the owner, without a login, so a fresh database can get its first teams ([SPEC-admin-04]). It writes the team and its change_log row (actor `system`, source `api`) in one transaction; when the team already exists it changes nothing and exits 0. Errors never print the connection string.
 
 ## Data
 
